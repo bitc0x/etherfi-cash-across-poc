@@ -34,7 +34,21 @@ type Phase =
   | 'filled'
   | 'error';
 
+type Mode = 'buy' | 'sell';
+
 const SAFE_BALANCE_USDC = 5000;
+
+// Mock Ethereum vault holdings shown in sell mode
+const ETH_VAULT_BALANCES: Record<string, number> = {
+  sDAI: 850,
+  sUSDe: 600,
+  USDS: 400,
+  USDY: 350,
+  wstETH: 0.45,
+  weETH: 0.30,
+  USDC: 1200,
+  ONDO: 0,
+};
 
 export default function CashDemo() {
   const { address, isConnected } = useAccount();
@@ -48,8 +62,9 @@ export default function CashDemo() {
   const [dataLoading, setDataLoading] = useState(true);
 
   // Form state
+  const [mode, setMode] = useState<Mode>('buy');
   const [amount, setAmount] = useState('100');
-  const [selectedSymbol, setSelectedSymbol] = useState(DEMO_DEST_SYMBOLS[1].symbol); // sDAI default
+  const [selectedSymbol, setSelectedSymbol] = useState('sDAI');
   const [quote, setQuote] = useState<Quote | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -104,7 +119,16 @@ export default function CashDemo() {
     [chains],
   );
 
-  // Fetch quote on input change
+  // Reset transient state when toggling mode
+  useEffect(() => {
+    setQuote(null);
+    setPhase('idle');
+    setError(null);
+    setOriginTxHash(null);
+    setFillTxHash(null);
+  }, [mode]);
+
+  // Fetch quote on input change. Direction depends on mode.
   useEffect(() => {
     if (!address || !amount || Number(amount) <= 0 || !selectedAsset?.token) {
       setQuote(null);
@@ -116,12 +140,21 @@ export default function CashDemo() {
       setPhase('quoting');
       setError(null);
       try {
-        const raw = parseUnits(amount, ORIGIN_USDC.decimals);
+        // Build params per direction.
+        // Buy: input USDC OP (6 decimals), output asset on ETH
+        // Sell: input asset on ETH, output USDC OP
+        const isBuy = mode === 'buy';
+        const inputToken = isBuy ? ORIGIN_USDC.address : selectedAsset.token!.address;
+        const outputToken = isBuy ? selectedAsset.token!.address : ORIGIN_USDC.address;
+        const originChainId = isBuy ? ORIGIN_USDC.chainId : selectedAsset.token!.chainId;
+        const destinationChainId = isBuy ? selectedAsset.token!.chainId : ORIGIN_USDC.chainId;
+        const inputDecimals = isBuy ? ORIGIN_USDC.decimals : selectedAsset.token!.decimals;
+        const raw = parseUnits(amount, inputDecimals);
         const params = new URLSearchParams({
-          inputToken: ORIGIN_USDC.address,
-          outputToken: selectedAsset.token!.address,
-          originChainId: String(ORIGIN_USDC.chainId),
-          destinationChainId: String(selectedAsset.token!.chainId),
+          inputToken,
+          outputToken,
+          originChainId: String(originChainId),
+          destinationChainId: String(destinationChainId),
           amount: raw.toString(),
           depositor: address,
           recipient: address,
@@ -144,7 +177,7 @@ export default function CashDemo() {
       clearTimeout(t);
       ctrl.abort();
     };
-  }, [address, amount, selectedAsset]);
+  }, [address, amount, selectedAsset, mode]);
 
   const feePct = useMemo(() => {
     const raw = quote?.fees?.total?.pct;
@@ -171,18 +204,21 @@ export default function CashDemo() {
     if (!quote || !address || !selectedAsset?.token) return;
     setError(null);
     try {
-      if (chainId !== ORIGIN_USDC.chainId) {
-        await switchChain({ chainId: ORIGIN_USDC.chainId });
+      const isBuy = mode === 'buy';
+      const originChain = isBuy ? ORIGIN_USDC.chainId : selectedAsset.token.chainId;
+      const inputTokenAddress = isBuy ? ORIGIN_USDC.address : selectedAsset.token.address;
+
+      if (chainId !== originChain) {
+        await switchChain({ chainId: originChain });
       }
-      if (needsApproval) {
-        // Build approval calldata: selector 0x095ea7b3 + spender + amount
-        const spender = (quote.swapTx?.to || '').replace(/^0x/, '').padStart(64, '0');
-        const amt = (1n << 256n) - 1n; // max uint
+      if (needsApproval && quote.swapTx?.to) {
+        const spender = quote.swapTx.to.replace(/^0x/, '').padStart(64, '0');
+        const amt = (1n << 256n) - 1n;
         const amtHex = amt.toString(16).padStart(64, '0');
         const data = `0x095ea7b3${spender}${amtHex}` as `0x${string}`;
         setPhase('approving');
         await sendTransactionAsync({
-          to: ORIGIN_USDC.address as `0x${string}`,
+          to: inputTokenAddress as `0x${string}`,
           data,
         });
       }
@@ -201,7 +237,7 @@ export default function CashDemo() {
       const poll = async () => {
         try {
           const r = await fetch(
-            `/api/status?originChainId=${ORIGIN_USDC.chainId}&depositTxHash=${txHash}`,
+            `/api/status?originChainId=${originChain}&depositTxHash=${txHash}`,
             { cache: 'no-store' },
           );
           if (r.ok) {
@@ -260,13 +296,17 @@ export default function CashDemo() {
             </div>
           </section>
 
-          {/* Across · Buy on Ethereum (replaces Spend with Cash) */}
+          {/* Across · Buy or Sell on Ethereum (powered by Across Swap API) */}
           <section className="card p-7">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-3">
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-5 gap-3">
               <div>
-                <div className="font-serif text-2xl gold-text">Buy on Ethereum</div>
+                <div className="font-serif text-2xl gold-text">
+                  {mode === 'buy' ? 'Buy on Ethereum' : 'Sell on Ethereum'}
+                </div>
                 <p className="text-sm text-cream-400 mt-1">
-                  Spend USDC from your Cash safe on any Ethereum asset. One signature, ~2s settlement.
+                  {mode === 'buy'
+                    ? 'Spend USDC from your Cash safe on any Ethereum asset. One signature, ~2s settlement.'
+                    : 'Sell an Ethereum vault position back into USDC on your Cash safe. Same flow, reversed.'}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -275,11 +315,31 @@ export default function CashDemo() {
               </div>
             </div>
 
+            {/* Buy / Sell toggle */}
+            <div className="inline-flex bg-bg-700 rounded-full p-1 mb-6 border border-white/[0.06]">
+              <button
+                onClick={() => setMode('buy')}
+                className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${
+                  mode === 'buy' ? 'bg-gold-500 text-[#1A140A]' : 'text-cream-300 hover:text-cream-100'
+                }`}
+              >
+                Buy
+              </button>
+              <button
+                onClick={() => setMode('sell')}
+                className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${
+                  mode === 'sell' ? 'bg-gold-500 text-[#1A140A]' : 'text-cream-300 hover:text-cream-100'
+                }`}
+              >
+                Sell
+              </button>
+            </div>
+
             <div className="grid lg:grid-cols-[1fr_auto_1fr] gap-3 items-center">
-              {/* From */}
+              {/* FROM card — content depends on mode */}
               <div className="card-inner p-5">
                 <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-3">
-                  From · Cash safe on Optimism
+                  {mode === 'buy' ? 'From · Cash safe on Optimism' : 'From · Ethereum vault'}
                 </div>
                 <div className="flex items-center gap-3 mb-4">
                   <input
@@ -289,24 +349,58 @@ export default function CashDemo() {
                     placeholder="0"
                     className="flex-1 bg-transparent text-3xl md:text-4xl font-semibold outline-none tabular min-w-0"
                   />
-                  <TokenChip
-                    symbol="USDC"
-                    chainName="Optimism"
-                    chainLogo={opChainLogo}
-                    tokenLogoFallback="usdc"
-                  />
+                  {mode === 'buy' ? (
+                    <TokenChip
+                      symbol="USDC"
+                      chainName="Optimism"
+                      chainLogo={opChainLogo}
+                      tokenColor="#2775CA"
+                    />
+                  ) : (
+                    <AssetSelect
+                      value={selectedSymbol}
+                      onChange={setSelectedSymbol}
+                      options={destOptions}
+                      chainLogo={ethChainLogo}
+                      loading={dataLoading}
+                    />
+                  )}
                 </div>
                 <div className="flex items-center justify-between text-xs text-cream-400">
-                  <span>
-                    Balance:{' '}
-                    <span className="text-cream-200 tabular">{SAFE_BALANCE_USDC.toLocaleString()} USDC</span>
-                  </span>
-                  <button
-                    onClick={() => setAmount(String(SAFE_BALANCE_USDC))}
-                    className="px-2 py-0.5 rounded-full border border-white/10 text-cream-300 hover:bg-bg-500"
-                  >
-                    Max
-                  </button>
+                  {mode === 'buy' ? (
+                    <>
+                      <span>
+                        Balance:{' '}
+                        <span className="text-cream-200 tabular">
+                          {SAFE_BALANCE_USDC.toLocaleString()} USDC
+                        </span>
+                      </span>
+                      <button
+                        onClick={() => setAmount(String(SAFE_BALANCE_USDC))}
+                        className="px-2 py-0.5 rounded-full border border-white/10 text-cream-300 hover:bg-bg-500"
+                      >
+                        Max
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <span>
+                        Vault balance:{' '}
+                        <span className="text-cream-200 tabular">
+                          {(ETH_VAULT_BALANCES[selectedSymbol] ?? 0).toLocaleString()} {selectedSymbol}
+                        </span>
+                      </span>
+                      <button
+                        onClick={() =>
+                          setAmount(String(ETH_VAULT_BALANCES[selectedSymbol] ?? 0))
+                        }
+                        disabled={(ETH_VAULT_BALANCES[selectedSymbol] ?? 0) === 0}
+                        className="px-2 py-0.5 rounded-full border border-white/10 text-cream-300 hover:bg-bg-500 disabled:opacity-40"
+                      >
+                        Max
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -317,34 +411,43 @@ export default function CashDemo() {
                 </div>
               </div>
 
-              {/* To */}
+              {/* TO card — content depends on mode */}
               <div className="card-inner p-5">
                 <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-3">
-                  To · Ethereum vault
+                  {mode === 'buy' ? 'To · Ethereum vault' : 'To · Cash safe on Optimism'}
                 </div>
                 <div className="flex items-center gap-3 mb-4">
                   <input
                     readOnly
-                    value={quote ? formatUnits(quote.expectedOutputAmount, quote.outputToken.decimals, 6) : ''}
+                    value={
+                      quote
+                        ? formatUnits(quote.expectedOutputAmount, quote.outputToken.decimals, 6)
+                        : ''
+                    }
                     placeholder="0"
                     className="flex-1 bg-transparent text-3xl md:text-4xl font-semibold outline-none tabular min-w-0 text-cream-200"
                   />
-                  <select
-                    value={selectedSymbol}
-                    onChange={(e) => setSelectedSymbol(e.target.value)}
-                    disabled={dataLoading || destOptions.length === 0}
-                    className="px-3 py-2 rounded-xl bg-bg-700 border border-white/[0.08] text-sm font-semibold cursor-pointer outline-none disabled:opacity-50"
-                  >
-                    {dataLoading && <option>Loading...</option>}
-                    {destOptions.map((o) => (
-                      <option key={o.symbol} value={o.symbol}>
-                        {o.symbol}
-                      </option>
-                    ))}
-                  </select>
+                  {mode === 'buy' ? (
+                    <AssetSelect
+                      value={selectedSymbol}
+                      onChange={setSelectedSymbol}
+                      options={destOptions}
+                      chainLogo={ethChainLogo}
+                      loading={dataLoading}
+                    />
+                  ) : (
+                    <TokenChip
+                      symbol="USDC"
+                      chainName="Optimism"
+                      chainLogo={opChainLogo}
+                      tokenColor="#2775CA"
+                    />
+                  )}
                 </div>
                 <div className="text-xs text-cream-400 truncate">
-                  {selectedAsset?.description}
+                  {mode === 'buy'
+                    ? selectedAsset?.description
+                    : 'Lands directly in the Cash safe on Optimism. Spendable on card immediately.'}
                 </div>
               </div>
             </div>
@@ -353,17 +456,35 @@ export default function CashDemo() {
             <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
               <QuoteRow label="Route">
                 <span className="flex items-center gap-1.5">
-                  {opChainLogo && (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={opChainLogo} alt="OP" className="w-4 h-4" />
+                  {mode === 'buy' ? (
+                    <>
+                      {opChainLogo && (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={opChainLogo} alt="OP" className="w-4 h-4" />
+                      )}
+                      <span className="text-cream-200">OP</span>
+                      <span className="text-cream-500">→</span>
+                      {ethChainLogo && (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={ethChainLogo} alt="ETH" className="w-4 h-4" />
+                      )}
+                      <span className="text-cream-200">ETH</span>
+                    </>
+                  ) : (
+                    <>
+                      {ethChainLogo && (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={ethChainLogo} alt="ETH" className="w-4 h-4" />
+                      )}
+                      <span className="text-cream-200">ETH</span>
+                      <span className="text-cream-500">→</span>
+                      {opChainLogo && (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={opChainLogo} alt="OP" className="w-4 h-4" />
+                      )}
+                      <span className="text-cream-200">OP</span>
+                    </>
                   )}
-                  <span className="text-cream-200">OP</span>
-                  <span className="text-cream-500">→</span>
-                  {ethChainLogo && (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={ethChainLogo} alt="ETH" className="w-4 h-4" />
-                  )}
-                  <span className="text-cream-200">ETH</span>
                 </span>
               </QuoteRow>
               <QuoteRow label="Settlement">
@@ -381,7 +502,9 @@ export default function CashDemo() {
                 )}
               </QuoteRow>
               <QuoteRow label="Destination action">
-                <span className="text-cream-200">Vault deposit (atomic)</span>
+                <span className="text-cream-200">
+                  {mode === 'buy' ? 'Vault deposit (atomic)' : 'Safe credit (atomic)'}
+                </span>
               </QuoteRow>
             </div>
 
@@ -398,6 +521,7 @@ export default function CashDemo() {
               ) : phase === 'filled' ? (
                 <FilledState
                   asset={selectedAsset?.symbol || ''}
+                  mode={mode}
                   originTxHash={originTxHash}
                   fillTxHash={fillTxHash}
                 />
@@ -414,14 +538,27 @@ export default function CashDemo() {
                   className="btn-gold w-full"
                 >
                   {phase === 'quoting' && 'Fetching quote...'}
-                  {phase === 'approving' && 'Approving USDC...'}
+                  {phase === 'approving' &&
+                    `Approving ${mode === 'buy' ? 'USDC' : selectedAsset?.symbol}...`}
                   {phase === 'signing' && 'Confirm in wallet...'}
-                  {phase === 'filling' && 'Filling on Ethereum...'}
+                  {phase === 'filling' &&
+                    (mode === 'buy' ? 'Filling on Ethereum...' : 'Filling on Optimism...')}
                   {(phase === 'idle' || phase === 'quoted' || phase === 'error') &&
-                    (needsApproval
-                      ? `Approve & buy ${selectedAsset?.symbol || ''}`
-                      : `Buy ${selectedAsset?.symbol || ''}`)}
+                    (mode === 'buy'
+                      ? needsApproval
+                        ? `Approve & buy ${selectedAsset?.symbol || ''}`
+                        : `Buy ${selectedAsset?.symbol || ''}`
+                      : needsApproval
+                        ? `Approve & sell ${selectedAsset?.symbol || ''}`
+                        : `Sell ${selectedAsset?.symbol || ''}`)}
                 </button>
+              )}
+              {mode === 'sell' && phase !== 'filled' && (
+                <p className="mt-3 text-[11px] text-cream-500 leading-relaxed">
+                  Sell mode shows a real, live Across quote in the return direction. Execution
+                  requires actual Ethereum-side balance; in production this would fire from
+                  ether.fi's Ethereum vault contract.
+                </p>
               )}
               {error && phase === 'error' && (
                 <div className="mt-3 text-xs text-red-400 bg-red-500/[0.06] border border-red-500/20 rounded-xl p-3">
@@ -432,7 +569,11 @@ export default function CashDemo() {
                 <div className="mt-3 text-xs text-cream-400">
                   Origin tx:{' '}
                   <a
-                    href={`https://optimistic.etherscan.io/tx/${originTxHash}`}
+                    href={`${
+                      mode === 'buy'
+                        ? 'https://optimistic.etherscan.io/tx/'
+                        : 'https://etherscan.io/tx/'
+                    }${originTxHash}`}
                     target="_blank"
                     rel="noreferrer"
                     className="gold-text hover:underline"
@@ -478,7 +619,7 @@ export default function CashDemo() {
             </div>
           </section>
 
-          <FlowExplainer asset={selectedAsset?.symbol || ''} />
+          <FlowExplainer asset={selectedAsset?.symbol || ''} mode={mode} />
         </main>
 
         <RightRail />
@@ -617,9 +758,9 @@ function DemoBanner() {
       <div className="text-sm leading-relaxed">
         <span className="font-semibold gold-text">Live PoC.</span>{' '}
         <span className="text-cream-200">
-          This is the ether.fi Cash safe view, with a new <em className="not-italic font-semibold">Buy on Ethereum</em> panel
-          powered by the Across Swap API. Connect a wallet, pick an asset, sign once. Quotes are live; execution settles on
-          Ethereum in roughly 2 seconds via Across.
+          This is the ether.fi Cash safe view with a new <em className="not-italic font-semibold">Buy / Sell on Ethereum</em> panel
+          powered by the Across Swap API. Connect a wallet, toggle Buy or Sell, pick an asset, sign once. Quotes are live in both
+          directions; outbound execution settles on Ethereum in roughly 2 seconds, return leg lands USDC back on the Cash safe.
         </span>
       </div>
     </div>
@@ -639,15 +780,19 @@ function TokenChip({
   symbol,
   chainName,
   chainLogo,
+  tokenColor = '#2775CA',
 }: {
   symbol: string;
   chainName: string;
   chainLogo?: string;
-  tokenLogoFallback?: string;
+  tokenColor?: string;
 }) {
   return (
     <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-bg-700 border border-white/[0.08]">
-      <div className="w-7 h-7 rounded-full bg-[#2775CA] flex items-center justify-center text-white text-xs font-bold">
+      <div
+        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
+        style={{ background: tokenColor }}
+      >
         $
       </div>
       <div className="min-w-0">
@@ -660,6 +805,52 @@ function TokenChip({
           {chainName}
         </div>
       </div>
+    </div>
+  );
+}
+
+function AssetSelect({
+  value,
+  onChange,
+  options,
+  chainLogo,
+  loading,
+}: {
+  value: string;
+  onChange: (s: string) => void;
+  options: Array<{ symbol: string; tag: string; description: string; token?: AcrossToken }>;
+  chainLogo?: string;
+  loading: boolean;
+}) {
+  const selected = options.find((o) => o.symbol === value);
+  return (
+    <div className="relative">
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={loading || options.length === 0}
+        className="appearance-none pl-3 pr-9 py-2 rounded-xl bg-bg-700 border border-white/[0.08] text-sm font-semibold cursor-pointer outline-none disabled:opacity-50 min-w-[7rem]"
+      >
+        {loading && <option>Loading...</option>}
+        {options.map((o) => (
+          <option key={o.symbol} value={o.symbol}>
+            {o.symbol}
+          </option>
+        ))}
+      </select>
+      <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none text-cream-400">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </div>
+      {/* Floating chain badge below selector */}
+      {selected && chainLogo && (
+        <div className="absolute -bottom-5 right-0 flex items-center gap-1 text-[10px] text-cream-500">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={chainLogo} alt="Ethereum" className="w-3 h-3" />
+          Ethereum
+        </div>
+      )}
     </div>
   );
 }
@@ -727,13 +918,22 @@ function AssetRow({
 
 function FilledState({
   asset,
+  mode,
   originTxHash,
   fillTxHash,
 }: {
   asset: string;
+  mode: Mode;
   originTxHash: string | null;
   fillTxHash: string | null;
 }) {
+  const isBuy = mode === 'buy';
+  const originUrlBase = isBuy
+    ? 'https://optimistic.etherscan.io/tx/'
+    : 'https://etherscan.io/tx/';
+  const fillUrlBase = isBuy
+    ? 'https://etherscan.io/tx/'
+    : 'https://optimistic.etherscan.io/tx/';
   return (
     <div className="card p-5 border-gold-500/30 bg-gold-500/[0.04]">
       <div className="flex items-center gap-2 mb-3">
@@ -741,7 +941,9 @@ function FilledState({
           ✓
         </div>
         <div className="font-serif text-lg gold-text">
-          {asset} deposited into your Ethereum vault.
+          {isBuy
+            ? `${asset} deposited into your Ethereum vault.`
+            : `${asset} sold. USDC credited to your Cash safe.`}
         </div>
       </div>
       <div className="text-xs text-cream-400 space-y-1">
@@ -749,7 +951,7 @@ function FilledState({
           <div>
             Origin tx ·{' '}
             <a
-              href={`https://optimistic.etherscan.io/tx/${originTxHash}`}
+              href={`${originUrlBase}${originTxHash}`}
               target="_blank"
               rel="noreferrer"
               className="gold-text hover:underline"
@@ -762,7 +964,7 @@ function FilledState({
           <div>
             Fill tx ·{' '}
             <a
-              href={`https://etherscan.io/tx/${fillTxHash}`}
+              href={`${fillUrlBase}${fillTxHash}`}
               target="_blank"
               rel="noreferrer"
               className="gold-text hover:underline"
@@ -776,17 +978,40 @@ function FilledState({
   );
 }
 
-function FlowExplainer({ asset }: { asset: string }) {
-  const steps = [
+function FlowExplainer({ asset, mode }: { asset: string; mode: Mode }) {
+  const buySteps = [
     { i: '1', t: 'Cash safe debits', d: 'USDC leaves the OP safe via Across SpokePool. One user signature.' },
     { i: '2', t: 'Relayer fills', d: 'Across relayer fronts USDC on Ethereum, settles in ~2 seconds.' },
-    { i: '3', t: 'Embedded action', d: `MulticallHandler routes USDC into ${asset || 'the target asset'} via 0x/Uniswap/LI.FI, atomically.` },
-    { i: '✓', t: 'Vault deposit', d: `${asset || 'The asset'} lands in the ether.fi Ethereum vault. Same transaction.` },
+    {
+      i: '3',
+      t: 'Embedded action',
+      d: `MulticallHandler routes USDC into ${asset || 'the target asset'} via 0x/Uniswap/LI.FI, atomically.`,
+    },
+    {
+      i: '✓',
+      t: 'Vault deposit',
+      d: `${asset || 'The asset'} lands in the ether.fi Ethereum vault. Same transaction.`,
+    },
   ];
+  const sellSteps = [
+    {
+      i: '1',
+      t: 'Vault sells',
+      d: `User triggers liquidation; ether.fi Ethereum vault unwinds the ${asset || 'asset'} position.`,
+    },
+    { i: '2', t: 'Across routes', d: 'Vault calls the Swap API with reversed params; relayer fronts USDC on OP.' },
+    { i: '3', t: 'Relayer fills', d: 'Across settles on Optimism in ~2 seconds. Same canonical USDC, no wrapped assets.' },
+    { i: '✓', t: 'Safe credit', d: 'USDC lands in the Cash safe on OP. Spendable on the card immediately.' },
+  ];
+  const steps = mode === 'buy' ? buySteps : sellSteps;
   return (
     <div className="card-strong p-7">
       <div className="eyebrow mb-3">What happens under the hood</div>
-      <h3 className="font-serif text-2xl gold-text mb-6">One signature, four atomic steps.</h3>
+      <h3 className="font-serif text-2xl gold-text mb-6">
+        {mode === 'buy'
+          ? 'One signature, four atomic steps.'
+          : 'Same flow, opposite direction.'}
+      </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {steps.map((s, idx) => (
           <div key={s.i} className={`card p-5 ${idx === 3 ? 'border-gold-500/40' : ''}`}>

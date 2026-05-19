@@ -24,6 +24,8 @@ export default async function LandingPage() {
       <StatStrip />
       <Unlock />
       <EmbeddedActions />
+      <ReturnLeg />
+      <Architecture />
       <WhyAcross />
       <TrackRecord />
       <CostVsAlternatives />
@@ -72,13 +74,14 @@ function Hero() {
         Cash, anywhere.
       </h1>
       <h2 className="text-3xl sm:text-4xl md:text-5xl font-light leading-[1.15] tracking-tight mb-8 max-w-3xl text-cream-100">
-        Any Ethereum asset, in one signature.
+        Any Ethereum asset. Both directions.
       </h2>
       <p className="text-lg text-cream-300 max-w-2xl mb-10 leading-relaxed">
-        Cash users hold USDC in a safe on Optimism. The assets they want, Ondo Global Markets,
-        sUSDe, weETH, anything Ethereum-only, live on Ethereum. Plug in Across, and one signature in
-        Cash routes USDC out, settles on Ethereum in roughly 2 seconds, and deposits into the
-        target asset atomically. No second tab, no manual bridge.
+        Cash users hold USDC in a safe on Optimism. The yield, RWAs, and tokens they want, USDY,
+        sUSDe, weETH, ONDO, and anything else Ethereum-only, live on Ethereum. Plug in Across, and
+        one signature in Cash routes USDC out, settles on Ethereum in roughly 2 seconds, and
+        deposits into the target asset atomically. Same architecture in reverse for the sell leg.
+        No second tab, no manual bridge.
       </p>
       <div className="flex flex-wrap gap-3">
         <Link href="/cash" className="btn-gold">
@@ -121,7 +124,7 @@ function Unlock() {
       n: '01',
       tag: 'Asset universe',
       h: 'Every Ethereum asset, reachable from Cash.',
-      p: "Today, Cash can't hold Ondo's tokenized stocks, sUSDe, weETH, USDS, or anything else Ethereum-only. Across closes that gap. The Swap API routes USDC on OP into the target asset on Ethereum via 0x, Uniswap, and LI.FI, and embedded actions deposit it into your Ethereum vault in the same transaction.",
+      p: "Today, Cash can't hold sUSDe, weETH, USDY, USDS, or Ondo's tokenized stocks. Across closes that gap. The Swap API routes USDC on OP into the target asset on Ethereum via 0x, Uniswap, and LI.FI. Embedded actions deposit it into ether.fi's Ethereum vault in the same transaction. For permissioned RWAs like Ondo GM stocks, the embedded action invokes the issuer's purchase contract directly from your KYC'd vault.",
     },
     {
       n: '02',
@@ -202,6 +205,160 @@ function EmbeddedActions() {
               <div className="text-sm text-cream-200 leading-relaxed">{s.d}</div>
             </div>
           ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ReturnLeg() {
+  const outbound = [
+    'USDC leaves the Cash safe on OP.',
+    'Across relayer fills on Ethereum (~2s).',
+    'MulticallHandler swaps and deposits into the ether.fi Ethereum vault.',
+  ];
+  const inbound = [
+    'User triggers sell from the ether.fi Ethereum vault.',
+    'Vault unwinds the position; MulticallHandler routes proceeds through Across.',
+    'USDC lands in the Cash safe on Optimism.',
+  ];
+  return (
+    <section className="max-w-6xl mx-auto px-6 py-24">
+      <div className="eyebrow mb-4">Both directions</div>
+      <h2 className="font-serif text-5xl md:text-6xl gold-text mb-6 max-w-3xl tracking-tightest leading-[1.05]">
+        And back again. Same architecture, opposite direction.
+      </h2>
+      <p className="text-cream-300 max-w-2xl mb-14 leading-relaxed">
+        Same Swap API, same MulticallHandler, same settlement guarantees. When a Cash user wants to
+        liquidate an Ethereum-side position back to USDC on their OP safe, the call is identical
+        with input and output reversed. No second integration to build, no separate UX.
+      </p>
+
+      <div className="card-strong p-8 md:p-10">
+        <div className="grid md:grid-cols-2 gap-8">
+          <div>
+            <div className="flex items-center gap-2 mb-5">
+              <div className="w-7 h-7 rounded-full bg-gold-500 text-[#1A140A] flex items-center justify-center font-serif text-base font-semibold">
+                ↑
+              </div>
+              <div className="font-serif text-2xl text-cream-50">Outbound · Buy</div>
+            </div>
+            <div className="text-sm text-cream-400 mb-5">Cash safe on OP → Ethereum vault</div>
+            <ol className="space-y-3 text-sm text-cream-200">
+              {outbound.map((step, i) => (
+                <li key={i} className="flex gap-3">
+                  <span className="text-gold-400 tabular font-semibold w-5 flex-shrink-0">
+                    {i + 1}.
+                  </span>
+                  <span className="leading-relaxed">{step}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+
+          <div className="md:border-l md:border-white/[0.06] md:pl-8">
+            <div className="flex items-center gap-2 mb-5">
+              <div className="w-7 h-7 rounded-full bg-bg-500 text-cream-200 flex items-center justify-center font-serif text-base font-semibold border border-gold-400/40">
+                ↓
+              </div>
+              <div className="font-serif text-2xl text-cream-50">Return · Sell</div>
+            </div>
+            <div className="text-sm text-cream-400 mb-5">Ethereum vault → Cash safe on OP</div>
+            <ol className="space-y-3 text-sm text-cream-200">
+              {inbound.map((step, i) => (
+                <li key={i} className="flex gap-3">
+                  <span className="text-gold-400 tabular font-semibold w-5 flex-shrink-0">
+                    {i + 1}.
+                  </span>
+                  <span className="leading-relaxed">{step}</span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </div>
+
+        <div className="divider my-8" />
+
+        <div className="flex flex-col md:flex-row items-start md:items-center gap-4 text-sm">
+          <div className="eyebrow whitespace-nowrap">Try both</div>
+          <p className="text-cream-300 leading-relaxed flex-1">
+            The live demo has a Buy / Sell toggle. Quotes return for both directions against your
+            production integrator ID.
+          </p>
+          <Link href="/cash" className="btn-outline-gold whitespace-nowrap">
+            Open demo →
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function Architecture() {
+  const ethfi = [
+    'Ethereum vault contract',
+    'UI abstraction across both safes',
+    'KYC routing for permissioned assets',
+    'Position accounting and yield display',
+  ];
+  const across = [
+    'Cross-chain routing (0x, Uniswap, LI.FI)',
+    '40+ independent relayers',
+    'SpokePool contracts, audited',
+    'MulticallHandler for embedded actions',
+    'Settlement via UMA optimistic oracle',
+    'Fill confirmation and status indexing',
+    'Quote API with live pricing',
+    'Fee accounting and appFee distribution',
+    'DEX aggregation on destination',
+    'Risk-bearing relayer capital',
+  ];
+  return (
+    <section className="max-w-6xl mx-auto px-6 py-24">
+      <div className="eyebrow mb-4">Don't reinvent the wheel</div>
+      <h2 className="font-serif text-5xl md:text-6xl gold-text mb-6 max-w-3xl tracking-tightest leading-[1.05]">
+        What ether.fi builds. What Across delivers.
+      </h2>
+      <p className="text-cream-300 max-w-3xl mb-14 leading-relaxed">
+        ether.fi keeps full control of the user-facing product and asset custody. Across is the
+        cross-chain layer underneath. Nothing in this stack needs to be rebuilt.
+      </p>
+
+      <div className="grid md:grid-cols-2 gap-5">
+        <div className="card p-8">
+          <div className="flex items-center gap-3 mb-6">
+            <Image src="/etherfi-logo.png" alt="ether.fi" width={28} height={28} className="rounded-full" />
+            <div className="font-serif text-2xl text-cream-50">ether.fi builds</div>
+          </div>
+          <ul className="space-y-3">
+            {ethfi.map((item) => (
+              <li key={item} className="flex gap-3 text-sm text-cream-200">
+                <span className="text-gold-400 mt-0.5">◆</span>
+                <span className="leading-relaxed">{item}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-6 pt-6 border-t border-white/[0.06] text-xs text-cream-400 leading-relaxed">
+            Four contracts and a UI. Familiar territory.
+          </div>
+        </div>
+
+        <div className="card p-8 border-gold-500/20">
+          <div className="flex items-center gap-3 mb-6">
+            <Image src="/across-logo.png" alt="Across" width={28} height={28} />
+            <div className="font-serif text-2xl gold-text">Across delivers</div>
+          </div>
+          <ul className="space-y-3">
+            {across.map((item) => (
+              <li key={item} className="flex gap-3 text-sm text-cream-200">
+                <span className="text-gold-400 mt-0.5">◆</span>
+                <span className="leading-relaxed">{item}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-6 pt-6 border-t border-gold-500/15 text-xs gold-text leading-relaxed">
+            Ten layers of cross-chain infrastructure. Live, audited, $35B+ proven.
+          </div>
         </div>
       </div>
     </section>

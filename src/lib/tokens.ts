@@ -28,9 +28,11 @@ export const ORIGIN_USDC = {
 // The actual token metadata (logo, address, decimals) is hydrated from /api/tokens.
 export const DEMO_DEST_SYMBOLS = [
   { symbol: 'USDC', tag: 'Stable', description: 'Native canonical USDC on Ethereum.' },
+  { symbol: 'USDY', tag: 'Ondo', description: "Ondo's yield-bearing USD. KYC-gated holder; routed via ether.fi vault." },
   { symbol: 'sDAI', tag: 'Yield', description: 'Savings DAI. MakerDAO savings rate, freely transferable.' },
   { symbol: 'sUSDe', tag: 'Yield', description: 'Staked USDe. Ethena synthetic dollar with funding-rate yield.' },
   { symbol: 'USDS', tag: 'Stable', description: 'Sky Dollar. Yield-bearing successor to DAI.' },
   { symbol: 'wstETH', tag: 'LST', description: 'Lido staked ETH, wrapped. Liquid staking yield.' },
   { symbol: 'weETH', tag: 'LST', description: 'ether.fi liquid restaked ETH. Stake yield plus EigenLayer points.' },
+  { symbol: 'ONDO', tag: 'Token', description: 'Ondo governance token. Exposure to the Ondo ecosystem.' },
 ];
