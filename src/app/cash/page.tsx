@@ -118,6 +118,11 @@ export default function CashDemo() {
     () => chains.find((c) => c.chainId === 1)?.logoUrl,
     [chains],
   );
+  // USDC logo on mainnet for the Assets row (Trustwallet-style icon)
+  const usdcLogo = useMemo(
+    () => destTokens.find((t) => t.symbol === 'USDC')?.logoUrl,
+    [destTokens],
+  );
 
   // Reset transient state when toggling mode
   useEffect(() => {
@@ -335,8 +340,8 @@ export default function CashDemo() {
               </button>
             </div>
 
-            <div className="grid lg:grid-cols-[1fr_auto_1fr] gap-3 items-center">
-              {/* FROM card — content depends on mode */}
+            <div className="space-y-2">
+              {/* FROM card */}
               <div className="card-inner p-5">
                 <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-3">
                   {mode === 'buy' ? 'From · Cash safe on Optimism' : 'From · Ethereum vault'}
@@ -361,6 +366,7 @@ export default function CashDemo() {
                       value={selectedSymbol}
                       onChange={setSelectedSymbol}
                       options={destOptions}
+                      chainName="Ethereum"
                       chainLogo={ethChainLogo}
                       loading={dataLoading}
                     />
@@ -404,14 +410,14 @@ export default function CashDemo() {
                 </div>
               </div>
 
-              {/* Arrow */}
-              <div className="flex items-center justify-center">
-                <div className="w-10 h-10 rounded-full bg-bg-700 border border-white/[0.08] flex items-center justify-center">
-                  <ArrowRightIcon />
+              {/* Arrow between cards */}
+              <div className="flex justify-center -my-3 relative z-10">
+                <div className="w-9 h-9 rounded-full bg-bg-800 border border-white/[0.10] flex items-center justify-center">
+                  <ArrowDownIcon />
                 </div>
               </div>
 
-              {/* TO card — content depends on mode */}
+              {/* TO card */}
               <div className="card-inner p-5">
                 <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-3">
                   {mode === 'buy' ? 'To · Ethereum vault' : 'To · Cash safe on Optimism'}
@@ -432,6 +438,7 @@ export default function CashDemo() {
                       value={selectedSymbol}
                       onChange={setSelectedSymbol}
                       options={destOptions}
+                      chainName="Ethereum"
                       chainLogo={ethChainLogo}
                       loading={dataLoading}
                     />
@@ -444,7 +451,7 @@ export default function CashDemo() {
                     />
                   )}
                 </div>
-                <div className="text-xs text-cream-400 truncate">
+                <div className="text-xs text-cream-400 line-clamp-2">
                   {mode === 'buy'
                     ? selectedAsset?.description
                     : 'Lands directly in the Cash safe on Optimism. Spendable on card immediately.'}
@@ -497,6 +504,8 @@ export default function CashDemo() {
                   <span className="px-2 py-0.5 rounded-full bg-gold-500 text-[#1A140A] font-semibold text-[10px] tracking-wider">
                     SPONSORED · FREE
                   </span>
+                ) : Math.abs(feePct) < 0.001 ? (
+                  <span className="text-cream-200 tabular">~0.000 bps</span>
                 ) : (
                   <span className="text-cream-200 tabular">{feePct.toFixed(3)} bps</span>
                 )}
@@ -589,9 +598,9 @@ export default function CashDemo() {
           <section className="card p-7">
             <div className="flex items-baseline justify-between mb-2">
               <h3 className="font-serif text-2xl gold-text">Assets</h3>
-              <a href="#" className="text-sm gold-text hover:underline">
+              <span className="text-sm gold-text cursor-default opacity-70">
                 Set Spend Priority
-              </a>
+              </span>
             </div>
             <p className="text-xs text-cream-400 mb-5">
               Direct Pay mode uses USD or EUR asset balances for card purchases.
@@ -602,6 +611,7 @@ export default function CashDemo() {
                 name="USD Coin"
                 chain="Optimism"
                 chainLogo={opChainLogo}
+                tokenLogo={usdcLogo}
                 balance={remainingBalance.toFixed(2)}
                 usd={remainingBalance}
                 highlight
@@ -813,44 +823,59 @@ function AssetSelect({
   value,
   onChange,
   options,
+  chainName,
   chainLogo,
   loading,
 }: {
   value: string;
   onChange: (s: string) => void;
   options: Array<{ symbol: string; tag: string; description: string; token?: AcrossToken }>;
+  chainName: string;
   chainLogo?: string;
   loading: boolean;
 }) {
   const selected = options.find((o) => o.symbol === value);
   return (
-    <div className="relative">
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={loading || options.length === 0}
-        className="appearance-none pl-3 pr-9 py-2 rounded-xl bg-bg-700 border border-white/[0.08] text-sm font-semibold cursor-pointer outline-none disabled:opacity-50 min-w-[7rem]"
-      >
-        {loading && <option>Loading...</option>}
-        {options.map((o) => (
-          <option key={o.symbol} value={o.symbol}>
-            {o.symbol}
-          </option>
-        ))}
-      </select>
-      <div className="absolute inset-y-0 right-2 flex items-center pointer-events-none text-cream-400">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-          <path d="M6 9l6 6 6-6" />
-        </svg>
-      </div>
-      {/* Floating chain badge below selector */}
-      {selected && chainLogo && (
-        <div className="absolute -bottom-5 right-0 flex items-center gap-1 text-[10px] text-cream-500">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={chainLogo} alt="Ethereum" className="w-3 h-3" />
-          Ethereum
+    <div className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl bg-bg-700 border border-white/[0.08]">
+      {selected?.token?.logoUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={selected.token.logoUrl}
+          alt={selected.symbol}
+          className="w-7 h-7 rounded-full"
+        />
+      ) : (
+        <div className="w-7 h-7 rounded-full bg-bg-500 flex items-center justify-center text-[10px] font-bold text-cream-200">
+          {selected?.symbol.slice(0, 3) || '?'}
         </div>
       )}
+      <div className="relative min-w-0">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={loading || options.length === 0}
+          className="appearance-none bg-transparent pr-6 text-sm font-semibold cursor-pointer outline-none disabled:opacity-50"
+        >
+          {loading && <option>Loading...</option>}
+          {options.map((o) => (
+            <option key={o.symbol} value={o.symbol} className="bg-bg-700">
+              {o.symbol}
+            </option>
+          ))}
+        </select>
+        <div className="absolute inset-y-0 right-0 flex items-center pointer-events-none text-cream-400">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+            <path d="M6 9l6 6 6-6" />
+          </svg>
+        </div>
+        <div className="flex items-center gap-1 text-[10px] text-cream-400 mt-0.5">
+          {chainLogo && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={chainLogo} alt={chainName} className="w-3 h-3" />
+          )}
+          {chainName}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1059,6 +1084,13 @@ function ArrowRightIcon() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
       <path d="M5 12h14M13 5l7 7-7 7" />
+    </svg>
+  );
+}
+function ArrowDownIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-cream-300">
+      <path d="M12 5v14M5 13l7 7 7-7" />
     </svg>
   );
 }

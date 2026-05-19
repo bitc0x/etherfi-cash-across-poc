@@ -159,7 +159,7 @@ function Unlock() {
               <div className="text-[11px] uppercase tracking-widest text-cream-400">{c.tag}</div>
             </div>
             <h3 className="font-serif text-2xl text-cream-50 mb-4 leading-tight">{c.h}</h3>
-            <p className="text-cream-300 text-sm leading-relaxed">{c.p}</p>
+            <p className="text-cream-300 text-sm leading-relaxed flex-1">{c.p}</p>
           </div>
         ))}
       </div>
@@ -325,12 +325,12 @@ function Architecture() {
       </p>
 
       <div className="grid md:grid-cols-2 gap-5">
-        <div className="card p-8">
+        <div className="card p-8 flex flex-col">
           <div className="flex items-center gap-3 mb-6">
             <Image src="/etherfi-logo.png" alt="ether.fi" width={28} height={28} className="rounded-full" />
             <div className="font-serif text-2xl text-cream-50">ether.fi builds</div>
           </div>
-          <ul className="space-y-3">
+          <ul className="space-y-3 flex-1">
             {ethfi.map((item) => (
               <li key={item} className="flex gap-3 text-sm text-cream-200">
                 <span className="text-gold-400 mt-0.5">◆</span>
@@ -343,12 +343,12 @@ function Architecture() {
           </div>
         </div>
 
-        <div className="card p-8 border-gold-500/20">
+        <div className="card p-8 border-gold-500/20 flex flex-col">
           <div className="flex items-center gap-3 mb-6">
             <Image src="/across-logo.png" alt="Across" width={28} height={28} />
             <div className="font-serif text-2xl gold-text">Across delivers</div>
           </div>
-          <ul className="space-y-3">
+          <ul className="space-y-3 flex-1">
             {across.map((item) => (
               <li key={item} className="flex gap-3 text-sm text-cream-200">
                 <span className="text-gold-400 mt-0.5">◆</span>

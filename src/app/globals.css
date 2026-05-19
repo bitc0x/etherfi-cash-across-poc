@@ -31,6 +31,10 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+html { scroll-behavior: smooth; }
+
+[id] { scroll-margin-top: 80px; }
+
 /* Subtle radial vignette in the corners, ether.fi-style depth */
 body {
   background-image:
