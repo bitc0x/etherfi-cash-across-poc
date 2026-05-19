@@ -328,17 +328,34 @@ export default function LandingPage() {
         <h2 className="text-4xl md:text-5xl font-bold tracking-tightest mb-12 max-w-3xl">
           The leaders of crypto already ship Across.
         </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-          {['Circle', 'Coinbase', 'Uniswap', 'MetaMask', 'PancakeSwap', 'Hyperbeat', 'Hybra', 'Lido', 'Stratium'].map(
-            (p) => (
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {partners.map((p, i) => (
+            <div
+              key={p.name}
+              className="group relative overflow-hidden card aspect-[2.2/1] flex items-center justify-center transition-all duration-300 hover:border-mint-500/30 hover:-translate-y-0.5"
+              style={{
+                background:
+                  i % 2 === 0
+                    ? 'linear-gradient(135deg, rgba(15,19,24,0.9), rgba(20,25,33,0.6))'
+                    : 'linear-gradient(135deg, rgba(20,25,33,0.6), rgba(15,19,24,0.9))',
+              }}
+            >
               <div
-                key={p}
-                className="card p-5 text-center text-sm font-medium text-haze-200"
-              >
-                {p}
+                className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
+                style={{
+                  background:
+                    'radial-gradient(circle at 50% 120%, rgba(72,229,194,0.10), transparent 60%)',
+                }}
+              />
+              <div className="relative flex items-center gap-3 px-5">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={p.logo} alt={p.name} className="h-10 w-10 object-contain" />
+                <span className="text-base font-semibold tracking-tight text-haze-100">
+                  {p.name}
+                </span>
               </div>
-            ),
-          )}
+            </div>
+          ))}
         </div>
       </section>
 
@@ -364,12 +381,12 @@ export default function LandingPage() {
         <div className="grid md:grid-cols-2 gap-5">
           <CredCard
             label="Integrator ID"
-            value="0x0155"
+            value="0x0162"
             description="Pass as the integratorId query parameter on every Swap API call."
           />
           <CredCard
             label="API Key"
-            value="acx_YxiAk9cmVox9KndzY5tB_tQ42v3ZAedL"
+            value="acx_oVArKo8JzULZIcCJfTDjr6B7ab9J0yM2"
             description="Pass as a Bearer token in the Authorization header."
           />
         </div>
@@ -487,6 +504,15 @@ const benchRows = [
       { name: 'deBridge', cost: 'Unsupported', detail: '·', badge: '' },
     ],
   },
+];
+
+const partners = [
+  { name: 'Circle', logo: '/circle-logo.png' },
+  { name: 'Coinbase', logo: '/coinbase-logo.png' },
+  { name: 'Uniswap', logo: '/uniswap-logo.png' },
+  { name: 'MetaMask', logo: '/metamask-logo.png' },
+  { name: 'PancakeSwap', logo: '/pancakeswap-logo.png' },
+  { name: 'Hyperbeat', logo: '/hyperbeat-logo.png' },
 ];
 
 const chains = [

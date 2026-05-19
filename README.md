@@ -32,7 +32,7 @@ Vercel: connect the repo, set `ACROSS_API_KEY` and `ACROSS_INTEGRATOR_ID` as env
 
 ## Credentials (pre-provisioned for ether.fi)
 
-- Integrator ID: `0x0155`
+- Integrator ID: `0x0162`
 - API Key: passed as Bearer token via server-side proxy
 
 ---

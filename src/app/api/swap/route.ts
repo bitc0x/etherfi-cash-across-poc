@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
   }
 
   const apiKey = process.env.ACROSS_API_KEY;
-  const integratorId = process.env.ACROSS_INTEGRATOR_ID || '0x0155';
+  const integratorId = process.env.ACROSS_INTEGRATOR_ID || '0x0162';
 
   const url = new URL(`${ACROSS_BASE}/swap/approval`);
   url.searchParams.set('inputToken', inputToken);
