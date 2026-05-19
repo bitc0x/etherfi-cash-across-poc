@@ -3,13 +3,14 @@ import './globals.css';
 import { Providers } from './providers';
 
 export const metadata: Metadata = {
-  title: 'ether.fi × Across',
+  metadataBase: new URL('https://etherfi-cash-across-poc.vercel.app'),
+  title: 'ether.fi × Across · Cash, anywhere',
   description:
-    'Cash, anywhere. One transaction from your OP Cash vault to any Ethereum asset. Powered by Across Swap API.',
+    'One signature in your Cash safe. Any Ethereum asset. Powered by the Across Swap API.',
   icons: { icon: '/etherfi-logo.png' },
   openGraph: {
     title: 'ether.fi × Across',
-    description: 'Cash, anywhere. One transaction from your OP Cash vault to any Ethereum asset.',
+    description: 'One signature in your Cash safe. Any Ethereum asset.',
     images: ['/etherfi-logo.png'],
   },
 };

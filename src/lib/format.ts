@@ -29,9 +29,15 @@ export function shortAddr(a: string): string {
 export function friendlyError(raw: string): string {
   const s = raw.toLowerCase();
   if (s.includes('amount_too_low')) return 'Amount too low for this route. Try a larger size.';
-  if (s.includes('simulation_error')) return 'Simulation failed. Likely a destination call issue.';
+  if (s.includes('amount_too_high')) return 'Amount too high for this route. Try a smaller size.';
+  if (s.includes('simulation_error')) return 'Simulation failed. Destination call may be invalid.';
+  if (s.includes('slippage') && s.includes('insufficient'))
+    return 'Slippage tolerance too low for this token pair.';
   if (s.includes('insufficient')) return 'Insufficient balance or allowance.';
   if (s.includes('user rejected') || s.includes('user denied')) return 'Transaction rejected.';
-  if (s.includes('not supported')) return 'This route is not currently supported.';
-  return raw.length > 120 ? raw.slice(0, 120) + '...' : raw;
+  if (s.includes('not supported') || s.includes('unsupported_route'))
+    return 'This route is not currently supported.';
+  if (s.includes('quote_fetch_failed') || s.includes('quote failed'))
+    return 'Could not fetch a live quote. Try again in a moment.';
+  return raw.length > 140 ? raw.slice(0, 140) + '...' : raw;
 }

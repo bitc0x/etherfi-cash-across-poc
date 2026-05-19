@@ -4,32 +4,45 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        ink: {
-          950: '#0A0D11',
-          900: '#0F1318',
-          850: '#141921',
-          800: '#1A2029',
-          700: '#222936',
-          600: '#2D3543',
-          500: '#3A4354',
+        bg: {
+          900: '#000000',
+          800: '#0A0A0B',
+          700: '#101113',
+          600: '#16181C',
+          500: '#1C1F24',
+          400: '#252930',
+        },
+        gold: {
+          200: '#F2DDB0',
+          300: '#E5C893',
+          400: '#D4B776',
+          500: '#C8A876',
+          600: '#B79764',
+          700: '#9A7E50',
         },
         mint: {
-          400: '#7BE3CC',
-          500: '#48E5C2',
-          600: '#2DC8A5',
-          700: '#1FA587',
+          400: '#7BE3B4',
+          500: '#6FE8B0',
+          600: '#4FCD92',
         },
-        haze: {
-          200: '#E6EAF0',
-          300: '#C7CFDB',
-          400: '#9AA5B6',
-          500: '#6B7588',
-          600: '#4A5364',
+        violet: {
+          300: '#C9B6FF',
+          400: '#B8A0FF',
+          500: '#9A82E8',
+        },
+        cream: {
+          50: '#FAFAF7',
+          100: '#F0EFEA',
+          200: '#D6D4CB',
+          300: '#A8A59C',
+          400: '#76746C',
+          500: '#52514A',
         },
       },
       fontFamily: {
         sans: ['Inter', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
-        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
+        serif: ['"Cormorant Garamond"', '"EB Garamond"', 'Georgia', 'serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       letterSpacing: {
         tightest: '-0.04em',

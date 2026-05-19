@@ -30,7 +30,7 @@ export async function GET(req: NextRequest) {
   url.searchParams.set('recipient', recipient || depositor);
   url.searchParams.set('tradeType', 'exactInput');
   url.searchParams.set('integratorId', integratorId);
-  url.searchParams.set('slippageTolerance', '1');
+  url.searchParams.set('slippageTolerance', '5');
 
   try {
     const headers: Record<string, string> = { Accept: 'application/json' };
@@ -39,7 +39,16 @@ export async function GET(req: NextRequest) {
     const r = await fetch(url.toString(), { headers, cache: 'no-store' });
     const text = await r.text();
     if (!r.ok) {
-      return NextResponse.json({ error: text || `upstream ${r.status}` }, { status: r.status });
+      // Try to parse the Across error envelope
+      try {
+        const j = JSON.parse(text);
+        return NextResponse.json(
+          { error: j.message || j.code || text, code: j.code },
+          { status: r.status },
+        );
+      } catch {
+        return NextResponse.json({ error: text || `upstream ${r.status}` }, { status: r.status });
+      }
     }
     try {
       return NextResponse.json(JSON.parse(text));

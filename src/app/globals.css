@@ -2,20 +2,25 @@
 @tailwind components;
 @tailwind utilities;
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Cormorant+Garamond:wght@400;500;600;700&display=swap');
 
 :root {
-  --bg: #0A0D11;
-  --bg-elev-1: #0F1318;
-  --bg-elev-2: #141921;
-  --bg-elev-3: #1A2029;
+  --bg: #000000;
+  --bg-elev-1: #0A0A0B;
+  --bg-elev-2: #101113;
+  --bg-elev-3: #16181C;
+  --bg-elev-4: #1C1F24;
   --border: rgba(255, 255, 255, 0.06);
   --border-strong: rgba(255, 255, 255, 0.10);
-  --text: #FFFFFF;
-  --text-muted: #9AA5B6;
-  --text-dim: #6B7588;
-  --mint: #48E5C2;
-  --mint-glow: rgba(72, 229, 194, 0.15);
+  --text: #FAFAF7;
+  --text-cream: #F0EFEA;
+  --text-muted: #A8A59C;
+  --text-dim: #76746C;
+  --gold: #C8A876;
+  --gold-bright: #E5C893;
+  --gold-glow: rgba(200, 168, 118, 0.18);
+  --mint: #6FE8B0;
+  --violet: #B8A0FF;
 }
 
 html, body {
@@ -26,56 +31,92 @@ html, body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Subtle radial vignette in the corners, ether.fi-style depth */
 body {
   background-image:
-    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(72, 229, 194, 0.08), transparent 60%),
-    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(72, 229, 194, 0.04), transparent 60%);
+    radial-gradient(ellipse 70% 50% at 50% -5%, rgba(200, 168, 118, 0.04), transparent 70%),
+    radial-gradient(ellipse 50% 30% at 85% 110%, rgba(200, 168, 118, 0.025), transparent 70%);
   background-attachment: fixed;
+}
+
+.serif {
+  font-family: 'Cormorant Garamond', 'EB Garamond', Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.font-serif {
+  font-family: 'Cormorant Garamond', 'EB Garamond', Georgia, serif;
 }
 
 .card {
   background: var(--bg-elev-1);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 18px;
 }
 
 .card-strong {
   background: var(--bg-elev-2);
   border: 1px solid var(--border-strong);
-  border-radius: 16px;
+  border-radius: 18px;
 }
 
-.btn-mint {
-  background: var(--mint);
-  color: #062119;
-  font-weight: 600;
-  border-radius: 12px;
-  padding: 0.75rem 1.25rem;
-  transition: all 0.15s ease;
+.card-inner {
+  background: var(--bg-elev-3);
+  border: 1px solid var(--border);
+  border-radius: 14px;
 }
-.btn-mint:hover { background: #5DEDD0; box-shadow: 0 0 30px var(--mint-glow); }
-.btn-mint:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Buttons follow ether.fi pill style */
+.btn-gold {
+  background: var(--gold);
+  color: #1A140A;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.875rem 1.5rem;
+  transition: all 0.18s ease;
+  font-size: 0.9375rem;
+}
+.btn-gold:hover { background: var(--gold-bright); box-shadow: 0 0 28px var(--gold-glow); }
+.btn-gold:disabled { opacity: 0.38; cursor: not-allowed; box-shadow: none; }
+
+.btn-outline-gold {
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--gold);
+  border-radius: 999px;
+  padding: 0.875rem 1.5rem;
+  font-weight: 500;
+  transition: all 0.18s ease;
+  font-size: 0.9375rem;
+}
+.btn-outline-gold:hover { background: rgba(200, 168, 118, 0.08); }
 
 .btn-ghost {
   background: transparent;
-  color: var(--text);
+  color: var(--text-cream);
   border: 1px solid var(--border-strong);
-  border-radius: 12px;
-  padding: 0.75rem 1.25rem;
+  border-radius: 999px;
+  padding: 0.6875rem 1.25rem;
   font-weight: 500;
-  transition: all 0.15s ease;
+  transition: all 0.18s ease;
+  font-size: 0.875rem;
 }
-.btn-ghost:hover { background: var(--bg-elev-2); border-color: rgba(255, 255, 255, 0.18); }
+.btn-ghost:hover { background: var(--bg-elev-3); border-color: rgba(255, 255, 255, 0.18); }
 
 .eyebrow {
   font-size: 0.75rem;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--mint);
+  color: var(--gold);
 }
 
 .tabular { font-variant-numeric: tabular-nums; }
+
+.gold-text { color: var(--gold); }
+.mint-text { color: var(--mint); }
+.violet-text { color: var(--violet); }
 
 .divider {
   height: 1px;
@@ -84,5 +125,10 @@ body {
 
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--bg-elev-3); border-radius: 5px; }
+::-webkit-scrollbar-thumb { background: var(--bg-elev-4); border-radius: 5px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--border-strong); }
+
+/* Hide arrows from number inputs */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; }
