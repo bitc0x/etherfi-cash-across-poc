@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useAccount, useChainId, useSendTransaction, useSwitchChain } from 'wagmi';
 import type { AcrossChain, AcrossToken } from '@/lib/tokens';
-import { DEMO_DEST_SYMBOLS, ORIGIN_USDC } from '@/lib/tokens';
+import { DEMO_DEST_SYMBOLS, LOCAL_LOGO_OVERRIDES, ORIGIN_USDC, RELIABLE_LOGOS } from '@/lib/tokens';
 import { formatUnits, friendlyError, parseUnits } from '@/lib/format';
 
 type Quote = {
@@ -64,7 +64,7 @@ export default function CashDemo() {
   // Form state
   const [mode, setMode] = useState<Mode>('buy');
   const [amount, setAmount] = useState('100');
-  const [selectedSymbol, setSelectedSymbol] = useState('sDAI');
+  const [selectedSymbol, setSelectedSymbol] = useState('USDY');
   const [quote, setQuote] = useState<Quote | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -117,11 +117,6 @@ export default function CashDemo() {
   const ethChainLogo = useMemo(
     () => chains.find((c) => c.chainId === 1)?.logoUrl,
     [chains],
-  );
-  // USDC logo on mainnet for the Assets row (Trustwallet-style icon)
-  const usdcLogo = useMemo(
-    () => destTokens.find((t) => t.symbol === 'USDC')?.logoUrl,
-    [destTokens],
   );
 
   // Reset transient state when toggling mode
@@ -359,7 +354,7 @@ export default function CashDemo() {
                       symbol="USDC"
                       chainName="Optimism"
                       chainLogo={opChainLogo}
-                      tokenColor="#2775CA"
+                      tokenLogo={RELIABLE_LOGOS.USDC}
                     />
                   ) : (
                     <AssetSelect
@@ -447,7 +442,7 @@ export default function CashDemo() {
                       symbol="USDC"
                       chainName="Optimism"
                       chainLogo={opChainLogo}
-                      tokenColor="#2775CA"
+                      tokenLogo={RELIABLE_LOGOS.USDC}
                     />
                   )}
                 </div>
@@ -611,17 +606,21 @@ export default function CashDemo() {
                 name="USD Coin"
                 chain="Optimism"
                 chainLogo={opChainLogo}
-                tokenLogo={usdcLogo}
+                tokenLogo={RELIABLE_LOGOS.USDC}
                 balance={remainingBalance.toFixed(2)}
                 usd={remainingBalance}
                 highlight
               />
               <AssetRow
-                symbol={selectedAsset?.symbol || 'sDAI'}
-                name={selectedAsset?.token?.name || 'Savings DAI'}
+                symbol={selectedAsset?.symbol || 'USDY'}
+                name={selectedAsset?.token?.name || "Ondo USD Yield"}
                 chain="Ethereum"
                 chainLogo={ethChainLogo}
-                tokenLogo={selectedAsset?.token?.logoUrl}
+                tokenLogo={
+                  selectedAsset?.symbol
+                    ? LOCAL_LOGO_OVERRIDES[selectedAsset.symbol] || selectedAsset?.token?.logoUrl
+                    : undefined
+                }
                 balance="0.00"
                 usd={0}
                 pending
@@ -790,21 +789,28 @@ function TokenChip({
   symbol,
   chainName,
   chainLogo,
+  tokenLogo,
   tokenColor = '#2775CA',
 }: {
   symbol: string;
   chainName: string;
   chainLogo?: string;
+  tokenLogo?: string;
   tokenColor?: string;
 }) {
   return (
     <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-bg-700 border border-white/[0.08]">
-      <div
-        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
-        style={{ background: tokenColor }}
-      >
-        $
-      </div>
+      {tokenLogo ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={tokenLogo} alt={symbol} className="w-7 h-7 rounded-full" />
+      ) : (
+        <div
+          className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
+          style={{ background: tokenColor }}
+        >
+          $
+        </div>
+      )}
       <div className="min-w-0">
         <div className="text-sm font-semibold leading-tight">{symbol}</div>
         <div className="flex items-center gap-1 text-[10px] text-cream-400">
@@ -835,13 +841,14 @@ function AssetSelect({
   loading: boolean;
 }) {
   const selected = options.find((o) => o.symbol === value);
+  const logoUrl = LOCAL_LOGO_OVERRIDES[value] || selected?.token?.logoUrl;
   return (
     <div className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl bg-bg-700 border border-white/[0.08]">
-      {selected?.token?.logoUrl ? (
+      {logoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
-          src={selected.token.logoUrl}
-          alt={selected.symbol}
+          src={logoUrl}
+          alt={selected?.symbol || ''}
           className="w-7 h-7 rounded-full"
         />
       ) : (
