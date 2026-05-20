@@ -51,7 +51,8 @@ const STOCK_MOCK_BALANCES: Record<string, number> = {
 // Format the Across fee as a dollar amount given the input USD and the fee
 // percentage. feePct is in percent units (e.g. 0.00869 for 0.869 bps).
 function formatFeeUsd(inputUsd: number, feePct: number): string {
-  if (!Number.isFinite(inputUsd) || inputUsd <= 0) return '\u2014';
+  if (!Number.isFinite(inputUsd) || inputUsd <= 0) return '$0.00';
+  if (!Number.isFinite(feePct) || feePct <= 0) return '$0.00';
   const dollars = inputUsd * (feePct / 100);
   if (dollars < 0.0001) return '< $0.0001';
   if (dollars < 0.01) return `$${dollars.toFixed(4)}`;
@@ -596,14 +597,12 @@ export default function CashDemo() {
                 <span className="text-cream-200">~2 seconds</span>
               </QuoteRow>
               <QuoteRow label="Fees">
-                {feePct === null ? (
-                  <span className="text-cream-400">\u2014</span>
-                ) : isSponsored ? (
+                {isSponsored ? (
                   <span className="px-2 py-0.5 rounded-full bg-gold-500 text-[#1A140A] font-semibold text-[10px] tracking-wider">
-                    SPONSORED \u00b7 FREE
+                    SPONSORED · FREE
                   </span>
                 ) : (
-                  <span className="text-cream-200 tabular">{formatFeeUsd(usdAmount, feePct)}</span>
+                  <span className="text-cream-200 tabular">{formatFeeUsd(usdAmount, feePct ?? 0)}</span>
                 )}
               </QuoteRow>
             </div>
@@ -617,7 +616,7 @@ export default function CashDemo() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs tabular text-cream-200">
-                      {address.slice(0, 6)}\u2026{address.slice(-4)}
+                      {address.slice(0, 6)}...{address.slice(-4)}
                     </span>
                     <span className="text-[10px] text-cream-500">(your wallet)</span>
                   </div>
