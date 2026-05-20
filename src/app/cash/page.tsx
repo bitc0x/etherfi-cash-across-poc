@@ -1017,7 +1017,7 @@ function FlowExplainer({ asset, mode }: { asset: string; mode: Mode }) {
     {
       i: '3',
       t: 'Embedded action',
-      d: `MulticallHandler routes USDC into ${asset || 'the target asset'} via 0x/Uniswap/LI.FI, atomically.`,
+      d: `MulticallHandler swaps USDC into ${asset || 'the target asset'} atomically on Ethereum.`,
     },
     {
       i: '✓',

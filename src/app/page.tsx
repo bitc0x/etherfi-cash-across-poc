@@ -124,7 +124,7 @@ function Unlock() {
       n: '01',
       tag: 'Asset universe',
       h: 'Every Ethereum asset, reachable from Cash.',
-      p: "Today, Cash can't hold sUSDe, weETH, USDY, USDS, or Ondo's tokenized stocks. Across closes that gap. The Swap API routes USDC on OP into the target asset on Ethereum via 0x, Uniswap, and LI.FI. Embedded actions deposit it into ether.fi's Ethereum vault in the same transaction. For permissioned RWAs like Ondo GM stocks, the embedded action invokes the issuer's purchase contract directly from your KYC'd vault.",
+      p: "Today, Cash can't hold sUSDe, weETH, USDY, USDS, or Ondo's tokenized stocks. Across closes that gap. The Swap API routes USDC on OP into the target asset on Ethereum, and embedded actions deposit it into ether.fi's Ethereum vault in the same transaction. For permissioned RWAs like Ondo GM stocks, the embedded action invokes the issuer's purchase contract directly from your KYC'd vault.",
     },
     {
       n: '02',
@@ -302,7 +302,7 @@ function Architecture() {
     'Position accounting and yield display',
   ];
   const across = [
-    'Cross-chain routing (0x, Uniswap, LI.FI)',
+    'Cross-chain routing and swap execution',
     '40+ independent relayers',
     'SpokePool contracts, audited',
     'MulticallHandler for embedded actions',
