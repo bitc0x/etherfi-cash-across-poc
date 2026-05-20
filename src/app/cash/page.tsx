@@ -510,11 +510,23 @@ export default function CashDemo() {
                 <div className="flex items-center gap-3 mb-4">
                   <input
                     readOnly
-                    value={
-                      quote
+                    value={(() => {
+                      // Stocks: compute from mock price (no live quote)
+                      if (isStockSelected && selectedAsset?.symbol) {
+                        const n = Number(amount);
+                        if (!n || n <= 0) return '';
+                        const price = STOCK_MOCK_PRICE[selectedAsset.symbol] || 0;
+                        if (price <= 0) return '';
+                        // Buy: USDC -> shares (6 decimals); Sell: shares -> USDC (2 decimals)
+                        return mode === 'buy'
+                          ? (n / price).toFixed(6)
+                          : (n * price).toFixed(2);
+                      }
+                      // Live assets: use quote
+                      return quote
                         ? formatUnits(quote.expectedOutputAmount, quote.outputToken.decimals, 6)
-                        : ''
-                    }
+                        : '';
+                    })()}
                     placeholder="0"
                     className="flex-1 bg-transparent text-2xl md:text-3xl font-semibold outline-none tabular min-w-0 text-cream-200"
                   />
