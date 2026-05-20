@@ -1002,11 +1002,15 @@ function AssetSelect({
   const selected = options.find((o) => o.symbol === value);
   const isRwaStock = selected?.kind === 'rwa-stock';
   const logoUrl = isRwaStock ? null : LOCAL_LOGO_OVERRIDES[value] || selected?.token?.logoUrl;
+  // Layout mirrors TokenChip exactly. The native <select> is positioned absolutely
+  // over the entire chip with zero opacity, so clicks open the browser dropdown
+  // while the visible chip is entirely our styled markup. Guarantees pixel parity
+  // with TokenChip across browsers.
   return (
-    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-bg-700 border border-white/[0.08]">
+    <div className="relative flex items-center gap-2 px-3 py-2 rounded-xl bg-bg-700 border border-white/[0.08] cursor-pointer">
       {isRwaStock ? (
         <div
-          className="w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-bold text-white tracking-wider"
+          className="w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-bold text-white tracking-wider flex-shrink-0"
           style={{ background: selected?.accentColor || '#444' }}
         >
           {selected?.underlying || selected?.symbol.slice(0, 3)}
@@ -1016,33 +1020,18 @@ function AssetSelect({
         <img
           src={logoUrl}
           alt={selected?.symbol || ''}
-          className="w-7 h-7 rounded-full"
+          className="w-7 h-7 rounded-full flex-shrink-0"
         />
       ) : (
-        <div className="w-7 h-7 rounded-full bg-bg-500 flex items-center justify-center text-[10px] font-bold text-cream-200">
+        <div className="w-7 h-7 rounded-full bg-bg-500 flex items-center justify-center text-[10px] font-bold text-cream-200 flex-shrink-0">
           {selected?.symbol.slice(0, 3) || '?'}
         </div>
       )}
-      <div className="relative min-w-0">
-        <select
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={loading || options.length === 0}
-          className="appearance-none bg-transparent pr-6 text-sm font-semibold cursor-pointer outline-none disabled:opacity-50"
-        >
-          {loading && <option>Loading...</option>}
-          {options.map((o) => (
-            <option key={o.symbol} value={o.symbol} className="bg-bg-700">
-              {o.symbol}
-            </option>
-          ))}
-        </select>
-        <div className="absolute inset-y-0 right-0 flex items-center pointer-events-none text-cream-400">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <path d="M6 9l6 6 6-6" />
-          </svg>
+      <div className="min-w-0 pr-4">
+        <div className="text-sm font-semibold leading-tight flex items-center gap-1">
+          {selected?.symbol || '\u00a0'}
         </div>
-        <div className="flex items-center gap-1 text-[10px] text-cream-400 mt-0.5">
+        <div className="flex items-center gap-1 text-[10px] text-cream-400">
           {chainLogo && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={chainLogo} alt={chainName} className="w-3 h-3" />
@@ -1050,6 +1039,25 @@ function AssetSelect({
           {chainName}
         </div>
       </div>
+      <div className="absolute top-1/2 right-3 -translate-y-1/2 pointer-events-none text-cream-400">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+          <path d="M6 9l6 6 6-6" />
+        </svg>
+      </div>
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={loading || options.length === 0}
+        aria-label="Select destination asset"
+        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+      >
+        {loading && <option>Loading...</option>}
+        {options.map((o) => (
+          <option key={o.symbol} value={o.symbol} className="bg-bg-700">
+            {o.symbol}
+          </option>
+        ))}
+      </select>
     </div>
   );
 }

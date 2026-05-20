@@ -552,7 +552,7 @@ function TrackRecord() {
   );
 }
 
-// ether.fi cash-relevant chains (highlighted) — others are standard coverage
+// ether.fi cash-relevant chains (highlighted) (others are standard coverage)
 const CASH_CHAIN_IDS = new Set([10, 1]);
 
 function Coverage({ chains }: { chains: AcrossChain[] }) {
@@ -612,9 +612,8 @@ const partners = [
 function TrustedBy() {
   return (
     <section className="max-w-6xl mx-auto px-6 py-24">
-      <div className="eyebrow mb-4">Trusted by</div>
       <h2 className="font-serif text-5xl md:text-6xl gold-text mb-14 max-w-3xl tracking-tightest leading-[1.05]">
-        The leaders of crypto already ship Across.
+        Trusted and integrated by.
       </h2>
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {partners.map((p, i) => (
@@ -653,7 +652,7 @@ function MoreCollaboration() {
       n: '01',
       eyebrow: 'Deposits',
       title: 'Fund Cash from any token, any chain.',
-      body: "Today: USDC on Optimism only. With the Across Swap API: USDT on Arbitrum, ETH on Mainnet, USDe on Base, USDC on Polygon (any asset on any of 25+ chains) lands as USDC in the Cash safe in ~2 seconds. One signature. Collapses the 'I need to bridge first' onboarding friction.",
+      body: "Cash users today must hold USDC on Optimism to fund their safe, which means an extra bridge or swap step from wherever their assets actually live. With the Across Swap API: USDT on Arbitrum, ETH on Mainnet, USDe on Base, USDC on Polygon (any asset on any of 25+ chains) lands as USDC in the Cash safe in ~2 seconds. One signature. Collapses the 'I need to bridge first' onboarding friction.",
     },
     {
       n: '02',
@@ -683,7 +682,7 @@ function MoreCollaboration() {
       n: '06',
       eyebrow: 'Sponsored routes',
       title: '1:1 slippage-free route of your choice.',
-      body: "Across runs zero-fee sponsored corridors for partners on their highest-volume lanes. We can configure any route ether.fi prefers (USDC OP into a specific Ethereum asset, or a chain ether.fi wants to dominate) as 1:1 slippage-free at our expense. Same arrangement we run for stablecoin issuers today; standard part of the deal.",
+      body: "Across supports sponsored corridors where the Across fee is set to zero and routed with 1:1 slippage-free pricing for the user. The sponsor (the partner whose users are routing through it) covers the cost as part of their integration economics. Stablecoin issuers and protocols run this today for their highest-volume lanes. ether.fi can pick a route (USDC OP into a specific Ethereum asset, or any other corridor Cash cares most about) and we wire it up jointly.",
     },
   ];
 
@@ -782,8 +781,10 @@ function FinalCTA() {
           The PoC is already running.
         </h2>
         <p className="text-cream-300 mb-10 max-w-2xl mx-auto leading-relaxed text-lg">
-          The Cash safe view, with the Across Swap API wired into a new "Buy on Ethereum" flow.
-          Live quotes, live execution, on-chain settlement.
+          The Cash safe view with the Across Swap API wired in, both directions. Opens on
+          TSLAon showing the Ondo GM architecture, switch to USDY (or any live yield asset) for
+          end-to-end execution against our production integrator ID. Live quotes, live execution,
+          on-chain settlement. Connect a wallet, try it. Then let's talk about the rest.
         </p>
         <Link href="/cash" className="btn-gold inline-block">
           Open the live PoC →

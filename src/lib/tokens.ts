@@ -34,7 +34,7 @@ export const ORIGIN_USDC = {
 // kind: 'rwa-yield'   = Ondo yield product (USDY). Live-routable via Across Swap API.
 // kind: 'live'        = Any Ethereum-only asset directly routable via Across Swap API.
 //
-// underlying: human ticker for stocks (e.g. "TSLA" for TSLAon) — used for visual styling.
+// underlying: human ticker for stocks (e.g. "TSLA" for TSLAon) (used for visual styling).
 export type DemoAsset = {
   symbol: string;
   kind: 'rwa-stock' | 'rwa-yield' | 'live';
@@ -45,7 +45,7 @@ export type DemoAsset = {
 };
 
 export const DEMO_DEST_SYMBOLS: DemoAsset[] = [
-  // Ondo Global Markets tokenized stocks (Shivam's example) — permissioned RWAs
+  // Ondo Global Markets tokenized stocks (Shivam's example) (permissioned RWAs)
   { symbol: 'TSLAon', kind: 'rwa-stock', tag: 'Ondo GM', underlying: 'TSLA', accentColor: '#E31937', description: 'Tesla, tokenized. Ondo Global Markets. Routed via KYC\u2019d ether.fi Ethereum vault.' },
   { symbol: 'AAPLon', kind: 'rwa-stock', tag: 'Ondo GM', underlying: 'AAPL', accentColor: '#A2AAAD', description: 'Apple, tokenized. Ondo Global Markets. Routed via KYC\u2019d ether.fi Ethereum vault.' },
   { symbol: 'NVDAon', kind: 'rwa-stock', tag: 'Ondo GM', underlying: 'NVDA', accentColor: '#76B900', description: 'Nvidia, tokenized. Ondo Global Markets. Routed via KYC\u2019d ether.fi Ethereum vault.' },
@@ -53,7 +53,7 @@ export const DEMO_DEST_SYMBOLS: DemoAsset[] = [
   { symbol: 'SPYon', kind: 'rwa-stock', tag: 'Ondo GM', underlying: 'SPY', accentColor: '#1E40AF', description: 'S&P 500 ETF, tokenized. Ondo Global Markets. Routed via KYC\u2019d ether.fi Ethereum vault.' },
   { symbol: 'QQQon', kind: 'rwa-stock', tag: 'Ondo GM', underlying: 'QQQ', accentColor: '#7C3AED', description: 'Nasdaq-100 ETF, tokenized. Ondo Global Markets. Routed via KYC\u2019d ether.fi Ethereum vault.' },
 
-  // Ondo yield product — live-quotable (same architecture, no KYC gate)
+  // Ondo yield product (live-quotable, same architecture, no KYC gate)
   { symbol: 'USDY', kind: 'rwa-yield', tag: 'Ondo', description: "Ondo's yield-bearing USD. Same architecture as Ondo GM stocks; live-routable today." },
 
   // Other Ethereum-only assets the same path unlocks
@@ -69,7 +69,7 @@ export const DEMO_DEST_SYMBOLS: DemoAsset[] = [
 export const STOCK_SYMBOLS = DEMO_DEST_SYMBOLS.filter((a) => a.kind === 'rwa-stock').map((a) => a.symbol);
 export const isStock = (symbol: string) => STOCK_SYMBOLS.includes(symbol);
 
-// Mock prices (USD) for stock tokens — used for balance display in Sell mode.
+// Mock prices (USD) for stock tokens (used for balance display in Sell mode).
 // Real Ondo GM tokens track NYSE/Nasdaq pricing via Chainlink; these are illustrative
 // for the demo and rounded to recognizable levels.
 export const STOCK_MOCK_PRICE: Record<string, number> = {
