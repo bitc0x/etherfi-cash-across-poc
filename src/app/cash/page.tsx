@@ -1003,7 +1003,7 @@ function AssetSelect({
   const isRwaStock = selected?.kind === 'rwa-stock';
   const logoUrl = isRwaStock ? null : LOCAL_LOGO_OVERRIDES[value] || selected?.token?.logoUrl;
   return (
-    <div className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl bg-bg-700 border border-white/[0.08]">
+    <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-bg-700 border border-white/[0.08]">
       {isRwaStock ? (
         <div
           className="w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-bold text-white tracking-wider"
