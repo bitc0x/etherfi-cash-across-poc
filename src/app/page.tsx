@@ -31,6 +31,7 @@ export default async function LandingPage() {
       <TrackRecord />
       <Coverage chains={chains} />
       <TrustedBy />
+      <MoreCollaboration />
       <Credentials />
       <FinalCTA />
       <Footer />
@@ -639,6 +640,75 @@ function TrustedBy() {
               <img src={p.logo} alt={p.name} className="h-10 w-10 object-contain" />
               <span className="text-base font-medium tracking-tight text-cream-100">{p.name}</span>
             </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function MoreCollaboration() {
+  const paths = [
+    {
+      n: '01',
+      eyebrow: 'Deposits',
+      title: 'Fund Cash from any token, any chain.',
+      body: "Today: USDC on Optimism only. With the Across Swap API: USDT on Arbitrum, ETH on Mainnet, USDe on Base, USDC on Polygon (any asset on any of 25+ chains) lands as USDC in the Cash safe in ~2 seconds. One signature. Collapses the 'I need to bridge first' onboarding friction.",
+    },
+    {
+      n: '02',
+      eyebrow: 'Withdrawals',
+      title: 'Exit Cash to any token, any chain.',
+      body: "Today: USDC withdrawals restricted to Optimism. With Across: route exits to any asset on any chain users want to use next. USDC OP into ETH on Arbitrum, DAI on Mainnet, USDS on Base, weETH on Linea, whatever they pick. One signature, ~2s settlement, same security envelope as the deposit leg.",
+    },
+    {
+      n: '03',
+      eyebrow: 'Deposit addresses',
+      title: 'A funding address per user, on every chain.',
+      body: "Across counterfactual deposit addresses: each Cash user gets a unique address on every supported chain. Anyone (the user, a friend, a CEX, an off-ramp, a payroll system) sends supported tokens to it; Across settles them into the Cash safe automatically. No connect-wallet step. Hyperbeat uses this pattern in production today.",
+    },
+    {
+      n: '04',
+      eyebrow: 'Gasless onboarding',
+      title: 'No native gas on the origin chain.',
+      body: "Combined with deposit addresses, the user never signs a tx or holds ETH/MATIC/AVAX/etc. on the chain they're funding from. Send straight from a CEX, an exchange wallet, or a payroll deposit. Removes the universal 'why is my deposit stuck' support ticket and the gas-token chicken-and-egg problem for new users.",
+    },
+    {
+      n: '05',
+      eyebrow: 'Card settlement',
+      title: 'Swap API behind every Cash card swipe.',
+      body: "When the user holds USDY, sUSDe, weETH, or a tokenized stock (post-Ondo integration), card-swipe triggers an atomic Swap API call: the position settles to USDC just-in-time for the merchant. Always-on yield, spendable anywhere Visa is accepted. Same Swap API primitive that powers the Buy / Sell panel, called server-side at swipe time.",
+    },
+    {
+      n: '06',
+      eyebrow: 'Sponsored routes',
+      title: '1:1 slippage-free route of your choice.',
+      body: "Across runs zero-fee sponsored corridors for partners on their highest-volume lanes. We can configure any route ether.fi prefers (USDC OP into a specific Ethereum asset, or a chain ether.fi wants to dominate) as 1:1 slippage-free at our expense. Same arrangement we run for stablecoin issuers today; standard part of the deal.",
+    },
+  ];
+
+  return (
+    <section className="max-w-6xl mx-auto px-6 py-24">
+      <div className="eyebrow mb-4">Beyond Ondo · further integration paths</div>
+      <h2 className="font-serif text-5xl md:text-6xl gold-text mb-6 max-w-3xl tracking-tightest leading-[1.05]">
+        Across can power more of Cash.
+      </h2>
+      <p className="text-cream-300 max-w-3xl mb-12 leading-relaxed text-lg">
+        Ondo stocks is the headline ask. Once the Swap API and KYC'd vault primitives are in
+        place, the same plumbing extends across the rest of the Cash product. Each one of
+        these is independently shippable. We'd love to discuss any of them on our call.
+      </p>
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {paths.map((p) => (
+          <div key={p.n} className="card p-6 hover:border-gold-500/30 transition-colors flex flex-col">
+            <div className="flex items-baseline justify-between mb-4">
+              <div className="font-serif text-3xl gold-text tabular leading-none">{p.n}</div>
+              <div className="text-[10px] uppercase tracking-widest text-cream-500">{p.eyebrow}</div>
+            </div>
+            <div className="font-serif text-lg text-cream-50 mb-3 leading-snug tracking-tight">
+              {p.title}
+            </div>
+            <p className="text-xs text-cream-300 leading-relaxed flex-1">{p.body}</p>
           </div>
         ))}
       </div>
