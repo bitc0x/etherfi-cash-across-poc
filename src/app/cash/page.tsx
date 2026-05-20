@@ -44,7 +44,7 @@ const ETH_VAULT_BALANCES: Record<string, number> = {
   TSLAon: 0.8,
   AAPLon: 1.2,
   NVDAon: 1.5,
-  MSFTon: 0.5,
+  GOOGLon: 1.0,
   SPYon: 0.4,
   QQQon: 0.3,
   USDY: 350,
@@ -299,29 +299,48 @@ export default function CashDemo() {
           <DemoBanner />
 
           {/* Total Balance hero */}
-          <section className="text-center py-6">
-            <div className="font-serif text-2xl md:text-3xl gold-text mb-3 flex items-center justify-center gap-2">
+          <section className="text-center py-2">
+            <div className="font-serif text-lg gold-text mb-2 flex items-center justify-center gap-1.5">
               Total Balance
               <span className="text-cream-400">
                 <EyeIcon />
               </span>
             </div>
-            <div className="text-7xl md:text-8xl font-bold tabular text-cream-50 tracking-tighter">
+            <div className="text-5xl md:text-6xl font-bold tabular text-cream-50 tracking-tighter">
               ${remainingBalance.toFixed(2)}
-              <span className="text-cream-400 text-2xl md:text-3xl ml-2 font-normal align-middle">
+              <span className="text-cream-400 text-base ml-2 font-normal align-middle">
                 USD
               </span>
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-3 mt-7">
-              <button className="btn-gold flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-center gap-2.5 mt-5">
+              <button className="btn-gold flex items-center gap-2 text-sm py-2.5 px-5">
                 <PlusIcon /> Add Funds
               </button>
-              <button className="btn-outline-gold flex items-center gap-2">
+              <button className="btn-outline-gold flex items-center gap-2 text-sm py-2.5 px-5">
                 <ArrowUpRightIcon /> Send
               </button>
-              <button className="btn-outline-gold flex items-center gap-2">
+              <button className="btn-outline-gold flex items-center gap-2 text-sm py-2.5 px-5">
                 <SwapIcon /> Convert
               </button>
+            </div>
+          </section>
+
+          {/* Spend with Cash · authentic ether.fi product framing (native section above the Across panel) */}
+          <section className="card p-5">
+            <div className="flex items-start justify-between gap-4 mb-3">
+              <div className="min-w-0">
+                <div className="font-serif text-lg text-cream-50 mb-0.5">Spend with Cash</div>
+                <p className="text-xs text-cream-400">
+                  Use your vault assets with your Cash credit card.
+                </p>
+              </div>
+              <button className="flex-shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-full border border-white/10 text-xs text-cream-200 hover:bg-bg-700 transition-colors">
+                <span className="gold-text">$</span> Direct Pay
+              </button>
+            </div>
+            <div className="border-t border-white/[0.06] pt-3 flex items-center justify-between text-xs">
+              <span className="text-cream-400">In Direct Pay Mode, you can spend up to</span>
+              <span className="text-cream-50 font-semibold tabular text-sm">$0.00</span>
             </div>
           </section>
 
@@ -329,26 +348,26 @@ export default function CashDemo() {
           <section className="card p-7">
             <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-5 gap-3">
               <div>
-                <div className="font-serif text-2xl gold-text">
+                <div className="font-serif text-xl gold-text">
                   {mode === 'buy' ? 'Buy on Ethereum' : 'Sell on Ethereum'}
                 </div>
-                <p className="text-sm text-cream-400 mt-1">
+                <p className="text-xs text-cream-400 mt-1">
                   {mode === 'buy'
                     ? 'Spend USDC from your Cash safe on any Ethereum asset. One signature, ~2s settlement.'
                     : 'Sell an Ethereum vault position back into USDC on your Cash safe. Same flow, reversed.'}
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                <Image src="/across-logo.png" alt="Across" width={22} height={22} />
-                <span className="text-xs text-cream-400 tracking-wider">POWERED BY ACROSS</span>
+                <Image src="/across-logo.png" alt="Across" width={20} height={20} />
+                <span className="text-[10px] text-cream-400 tracking-wider">POWERED BY ACROSS</span>
               </div>
             </div>
 
             {/* Buy / Sell toggle */}
-            <div className="inline-flex bg-bg-700 rounded-full p-1 mb-6 border border-white/[0.06]">
+            <div className="inline-flex bg-bg-700 rounded-full p-1 mb-5 border border-white/[0.06]">
               <button
                 onClick={() => setMode('buy')}
-                className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${
+                className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
                   mode === 'buy' ? 'bg-gold-500 text-[#1A140A]' : 'text-cream-300 hover:text-cream-100'
                 }`}
               >
@@ -356,7 +375,7 @@ export default function CashDemo() {
               </button>
               <button
                 onClick={() => setMode('sell')}
-                className={`px-5 py-2 rounded-full text-sm font-medium transition-colors ${
+                className={`px-4 py-1.5 rounded-full text-xs font-medium transition-colors ${
                   mode === 'sell' ? 'bg-gold-500 text-[#1A140A]' : 'text-cream-300 hover:text-cream-100'
                 }`}
               >
@@ -376,7 +395,7 @@ export default function CashDemo() {
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     placeholder="0"
-                    className="flex-1 bg-transparent text-3xl md:text-4xl font-semibold outline-none tabular min-w-0"
+                    className="flex-1 bg-transparent text-2xl md:text-3xl font-semibold outline-none tabular min-w-0"
                   />
                   {mode === 'buy' ? (
                     <TokenChip
@@ -455,7 +474,7 @@ export default function CashDemo() {
                         : ''
                     }
                     placeholder="0"
-                    className="flex-1 bg-transparent text-3xl md:text-4xl font-semibold outline-none tabular min-w-0 text-cream-200"
+                    className="flex-1 bg-transparent text-2xl md:text-3xl font-semibold outline-none tabular min-w-0 text-cream-200"
                   />
                   {mode === 'buy' ? (
                     <AssetSelect
@@ -637,12 +656,12 @@ export default function CashDemo() {
           {/* Assets list */}
           <section className="card p-7">
             <div className="flex items-baseline justify-between mb-2">
-              <h3 className="font-serif text-2xl gold-text">Assets</h3>
-              <span className="text-sm gold-text cursor-default opacity-70">
+              <h3 className="font-serif text-xl gold-text">Assets</h3>
+              <span className="text-xs gold-text cursor-default opacity-70 hover:opacity-100">
                 Set Spend Priority
               </span>
             </div>
-            <p className="text-xs text-cream-400 mb-5">
+            <p className="text-[11px] text-cream-400 mb-5">
               Direct Pay mode uses USD or EUR asset balances for card purchases.
             </p>
             <div className="space-y-3">
@@ -757,43 +776,45 @@ function RightRail() {
   return (
     <aside className="hidden lg:block">
       <div className="sticky top-4 space-y-4">
-        <div className="card p-5">
-          <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-1">Personal</div>
-          <div className="text-sm font-semibold truncate">ether.fi user</div>
+        <div className="card p-4">
+          <div className="text-[10px] uppercase tracking-widest text-cream-400 mb-1">Personal</div>
+          <div className="text-sm font-semibold truncate">John Doe</div>
         </div>
 
         <div className="card p-5">
-          <div className="flex items-center justify-between mb-1">
+          <div className="flex items-start justify-between mb-1">
             <div className="font-serif text-lg gold-text">Cashback</div>
-            <div className="text-[10px] uppercase tracking-widest text-cream-400">This month</div>
+            <div className="text-[10px] uppercase tracking-widest text-cream-400 mt-1">
+              Earned this month
+            </div>
           </div>
-          <div className="text-3xl font-bold tabular mint-text mt-2">$1.55</div>
+          <div className="text-2xl font-bold tabular mint-text mt-1">$1.55</div>
         </div>
 
         <div className="card p-5">
           <div className="font-serif text-lg gold-text mb-4">Your Cards</div>
           <div className="space-y-3">
-            <CardRow last4="6139" name="VICTOR BADRA" />
-            <CardRow last4="2530" name="VICTOR MANUEL BADRA MARTINEZ" />
+            <CardRow last4="6139" name="JOHN DOE" />
+            <CardRow last4="2530" name="JOHN DOE" />
           </div>
-          <button className="btn-outline-gold w-full mt-4 text-sm">Manage Cards</button>
+          <button className="btn-outline-gold w-full mt-4 text-xs py-2">Manage Cards</button>
         </div>
 
         <div className="card p-5">
           <div className="flex items-start gap-3 mb-3">
-            <div className="w-8 h-8 rounded-full bg-violet-400/15 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-full bg-violet-400/15 flex items-center justify-center flex-shrink-0">
               <HeartIcon />
             </div>
             <div>
-              <div className="font-serif text-base text-cream-50 leading-tight">
+              <div className="font-serif text-sm text-cream-50 leading-snug">
                 Invite friends, get 1% cashback
               </div>
             </div>
           </div>
-          <p className="text-xs text-cream-400 leading-relaxed mb-3">
+          <p className="text-[11px] text-cream-400 leading-relaxed mb-3">
             Get 1% cashback on purchases your friends make when they use their Cash credit card.
           </p>
-          <button className="btn-outline-gold w-full text-sm">Invite Friends</button>
+          <button className="btn-outline-gold w-full text-xs py-2">Invite Friends</button>
         </div>
       </div>
     </aside>
@@ -987,7 +1008,7 @@ function AssetRow({
 }) {
   return (
     <div
-      className={`flex items-center justify-between px-4 py-4 rounded-xl ${
+      className={`flex items-center justify-between px-3.5 py-3 rounded-xl ${
         highlight ? 'bg-gold-500/[0.04] border border-gold-500/20' : 'border border-white/[0.04]'
       } ${pending ? 'opacity-60' : ''}`}
     >
@@ -995,16 +1016,16 @@ function AssetRow({
         <div className="relative">
           {ticker ? (
             <div
-              className="w-10 h-10 rounded-md flex items-center justify-center text-white text-[11px] font-bold tracking-wider"
+              className="w-9 h-9 rounded-md flex items-center justify-center text-white text-[10px] font-bold tracking-wider"
               style={{ background: tickerColor || '#444' }}
             >
               {ticker}
             </div>
           ) : tokenLogo ? (
             /* eslint-disable-next-line @next/next/no-img-element */
-            <img src={tokenLogo} alt={symbol} className="w-10 h-10 rounded-full" />
+            <img src={tokenLogo} alt={symbol} className="w-9 h-9 rounded-full" />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-[#2775CA] flex items-center justify-center text-white text-xs font-bold">
+            <div className="w-9 h-9 rounded-full bg-[#2775CA] flex items-center justify-center text-white text-xs font-bold">
               {symbol.slice(0, 2)}
             </div>
           )}
@@ -1013,7 +1034,7 @@ function AssetRow({
             <img
               src={chainLogo}
               alt={chain}
-              className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full border border-bg-800"
+              className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full border border-bg-800"
             />
           )}
         </div>

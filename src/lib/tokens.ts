@@ -25,7 +25,7 @@ export const ORIGIN_USDC = {
 };
 
 // Curated symbols for the demo picker. Ordered with Shivam's literal ask first:
-// Ondo Global Markets tokenized stocks (TSLAon, AAPLon, NVDAon, MSFTon, SPYon, QQQon)
+// Ondo Global Markets tokenized stocks (TSLAon, AAPLon, NVDAon, GOOGLon, SPYon, QQQon)
 // followed by the "and the same path supports..." set of Ethereum-only live-routable assets.
 //
 // kind: 'rwa-stock'   = Ondo GM tokenized stock/ETF. Permissioned, KYC-gated. Architecture
@@ -49,7 +49,7 @@ export const DEMO_DEST_SYMBOLS: DemoAsset[] = [
   { symbol: 'TSLAon', kind: 'rwa-stock', tag: 'Ondo GM', underlying: 'TSLA', accentColor: '#E31937', description: 'Tesla, tokenized. Ondo Global Markets. Routed via KYC\u2019d ether.fi Ethereum vault.' },
   { symbol: 'AAPLon', kind: 'rwa-stock', tag: 'Ondo GM', underlying: 'AAPL', accentColor: '#A2AAAD', description: 'Apple, tokenized. Ondo Global Markets. Routed via KYC\u2019d ether.fi Ethereum vault.' },
   { symbol: 'NVDAon', kind: 'rwa-stock', tag: 'Ondo GM', underlying: 'NVDA', accentColor: '#76B900', description: 'Nvidia, tokenized. Ondo Global Markets. Routed via KYC\u2019d ether.fi Ethereum vault.' },
-  { symbol: 'MSFTon', kind: 'rwa-stock', tag: 'Ondo GM', underlying: 'MSFT', accentColor: '#00A4EF', description: 'Microsoft, tokenized. Ondo Global Markets. Routed via KYC\u2019d ether.fi Ethereum vault.' },
+  { symbol: 'GOOGLon', kind: 'rwa-stock', tag: 'Ondo GM', underlying: 'GOOGL', accentColor: '#4285F4', description: 'Alphabet, tokenized. Ondo Global Markets. Routed via KYC\u2019d ether.fi Ethereum vault.' },
   { symbol: 'SPYon', kind: 'rwa-stock', tag: 'Ondo GM', underlying: 'SPY', accentColor: '#1E40AF', description: 'S&P 500 ETF, tokenized. Ondo Global Markets. Routed via KYC\u2019d ether.fi Ethereum vault.' },
   { symbol: 'QQQon', kind: 'rwa-stock', tag: 'Ondo GM', underlying: 'QQQ', accentColor: '#7C3AED', description: 'Nasdaq-100 ETF, tokenized. Ondo Global Markets. Routed via KYC\u2019d ether.fi Ethereum vault.' },
 
@@ -76,7 +76,7 @@ export const STOCK_MOCK_PRICE: Record<string, number> = {
   TSLAon: 245,
   AAPLon: 188,
   NVDAon: 132,
-  MSFTon: 412,
+  GOOGLon: 178,
   SPYon: 568,
   QQQon: 482,
 };

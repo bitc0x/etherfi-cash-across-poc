@@ -77,7 +77,7 @@ function Hero() {
         Ondo's tokenized stocks, abstracted in Cash. Both directions.
       </h2>
       <p className="text-lg text-cream-300 max-w-3xl mb-10 leading-relaxed">
-        Cash holds USDC on Optimism. TSLAon, AAPLon, NVDAon, MSFTon, SPYon, QQQon, and Ondo's
+        Cash holds USDC on Optimism. TSLAon, AAPLon, NVDAon, GOOGLon, SPYon, QQQon, and Ondo's
         260+ tokenized US stocks and ETFs live on Ethereum, behind KYC. Plug in Across and one
         signature in Cash routes USDC out, settles on Ethereum in ~2 seconds, and atomically
         invokes Ondo GM's purchase contract from ether.fi's KYC'd Ethereum vault. The user sees
@@ -126,7 +126,7 @@ function Unlock() {
       n: '01',
       tag: 'Ondo stocks, first',
       h: 'TSLAon, AAPLon, NVDAon, in Cash.',
-      p: "Ondo Global Markets is the largest tokenized equity platform onchain. 260+ US stocks and ETFs (Tesla, Apple, Nvidia, Microsoft, S&P 500, Nasdaq 100) all live on Ethereum, behind KYC. ether.fi Cash users can't reach them today because Cash is on Optimism. Across closes the gap: USDC leaves the OP safe via Swap API, settles on Ethereum in ~2 seconds, and a single embedded action invokes Ondo GM's purchase contract from ether.fi's KYC'd Ethereum vault, atomically. The user sees TSLAon in their Cash UI; the vault holds it on their behalf. Same path works for USDY, sUSDe, weETH, USDS, and any other Ethereum-only asset, without the KYC gate.",
+      p: "Ondo Global Markets is the largest tokenized equity platform onchain. 260+ US stocks and ETFs (Tesla, Apple, Nvidia, Google, S&P 500, Nasdaq 100) all live on Ethereum, behind KYC. ether.fi Cash users can't reach them today because Cash is on Optimism. Across closes the gap: USDC leaves the OP safe via Swap API, settles on Ethereum in ~2 seconds, and a single embedded action invokes Ondo GM's purchase contract from ether.fi's KYC'd Ethereum vault, atomically. The user sees TSLAon in their Cash UI; the vault holds it on their behalf. Same path works for USDY, sUSDe, weETH, USDS, and any other Ethereum-only asset, without the KYC gate.",
     },
     {
       n: '02',
@@ -174,14 +174,14 @@ function OndoStocks() {
     { sym: 'TSLAon', tkr: 'TSLA', name: 'Tesla', color: '#E31937' },
     { sym: 'AAPLon', tkr: 'AAPL', name: 'Apple', color: '#A2AAAD' },
     { sym: 'NVDAon', tkr: 'NVDA', name: 'Nvidia', color: '#76B900' },
-    { sym: 'MSFTon', tkr: 'MSFT', name: 'Microsoft', color: '#00A4EF' },
     { sym: 'GOOGLon', tkr: 'GOOGL', name: 'Alphabet', color: '#4285F4' },
-    { sym: 'AMZNon', tkr: 'AMZN', name: 'Amazon', color: '#FF9900' },
-    { sym: 'METAon', tkr: 'META', name: 'Meta', color: '#1877F2' },
     { sym: 'SPYon', tkr: 'SPY', name: 'S&P 500 ETF', color: '#1E40AF' },
     { sym: 'QQQon', tkr: 'QQQ', name: 'Nasdaq 100 ETF', color: '#7C3AED' },
-    { sym: 'IAUon', tkr: 'IAU', name: 'Gold ETF', color: '#D4AF37' },
+    { sym: 'NFLXon', tkr: 'NFLX', name: 'Netflix', color: '#E50914' },
+    { sym: 'BABAon', tkr: 'BABA', name: 'Alibaba', color: '#FF6A00' },
+    { sym: 'CRCLon', tkr: 'CRCL', name: 'Circle', color: '#00B8B0' },
     { sym: 'SLVon', tkr: 'SLV', name: 'Silver ETF', color: '#9CA3AF' },
+    { sym: 'COPXon', tkr: 'COPX', name: 'Copper ETF', color: '#B45309' },
     { sym: '+249 more', tkr: '...', name: 'and counting', color: '#444' },
   ];
 
@@ -481,8 +481,8 @@ function Architecture() {
 
 function WhyAcross() {
   const features = [
-    { t: 'Speed', d: 'Sub-2 second median fill time across all routes. Fastest in the category.' },
-    { t: 'Cost', d: 'Lowest fees in the category, verifiable on-chain. Cash users keep more of their swap.' },
+    { t: 'Speed', d: 'Sub-2 second median fill time across all routes. Verifiable on every transaction.' },
+    { t: 'Cost', d: 'Single-digit basis points on Cash\u2019s routes, verifiable on-chain. Often free when sponsored.' },
     {
       t: 'Decentralization',
       d: '40+ independent relayers compete to fill. Funds escrowed in audited contracts, settled via UMA optimistic oracle. No single point of failure.',
