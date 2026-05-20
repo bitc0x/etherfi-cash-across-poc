@@ -23,6 +23,7 @@ export default async function LandingPage() {
       <Hero />
       <StatStrip />
       <Unlock />
+      <OndoStocks />
       <EmbeddedActions />
       <ReturnLeg />
       <Architecture />
@@ -70,17 +71,19 @@ function Hero() {
     <section className="max-w-6xl mx-auto px-6 pt-24 pb-20">
       <div className="eyebrow mb-6">Integration proposal · ether.fi Cash</div>
       <h1 className="font-serif text-6xl sm:text-7xl md:text-[5.5rem] leading-[1.02] tracking-tightest mb-7 max-w-4xl gold-text">
-        Cash, anywhere.
+        Tesla. Apple. Nvidia.<br />From your OP Cash safe.
       </h1>
       <h2 className="text-3xl sm:text-4xl md:text-5xl font-light leading-[1.15] tracking-tight mb-8 max-w-3xl text-cream-100">
-        Any Ethereum asset. Both directions.
+        Ondo's tokenized stocks, abstracted in Cash. Both directions.
       </h2>
-      <p className="text-lg text-cream-300 max-w-2xl mb-10 leading-relaxed">
-        Cash users hold USDC in a safe on Optimism. The yield, RWAs, and tokens they want, USDY,
-        sUSDe, weETH, ONDO, and anything else Ethereum-only, live on Ethereum. Plug in Across, and
-        one signature in Cash routes USDC out, settles on Ethereum in roughly 2 seconds, and
-        deposits into the target asset atomically. Same architecture in reverse for the sell leg.
-        No second tab, no manual bridge.
+      <p className="text-lg text-cream-300 max-w-3xl mb-10 leading-relaxed">
+        Cash holds USDC on Optimism. TSLAon, AAPLon, NVDAon, MSFTon, SPYon, QQQon, and Ondo's
+        260+ tokenized US stocks and ETFs live on Ethereum, behind KYC. Plug in Across and one
+        signature in Cash routes USDC out, settles on Ethereum in ~2 seconds, and atomically
+        invokes Ondo GM's purchase contract from ether.fi's KYC'd Ethereum vault. The user sees
+        their stock in Cash; the vault holds it on their behalf. Same architecture in reverse
+        for redemption. The same plumbing also unlocks USDY, sUSDe, weETH, and anything else
+        Ethereum-only.
       </p>
       <div className="flex flex-wrap gap-3">
         <Link href="/cash" className="btn-gold">
@@ -96,10 +99,10 @@ function Hero() {
 
 function StatStrip() {
   const stats = [
-    { value: '$35B+', label: 'Total volume bridged' },
-    { value: '<2s', label: 'Median fill time' },
-    { value: '40+', label: 'Independent relayers' },
-    { value: '40+ apps', label: 'Live integrations' },
+    { value: '$1.5B+', label: 'Ondo GM tokenized stock TVL' },
+    { value: '260+', label: 'Tokenized stocks & ETFs' },
+    { value: '<2s', label: 'Across settlement to Ethereum' },
+    { value: '$35B+', label: 'Across lifetime volume' },
   ];
   return (
     <section className="max-w-6xl mx-auto px-6 pb-24">
@@ -121,9 +124,9 @@ function Unlock() {
   const pillars = [
     {
       n: '01',
-      tag: 'Asset universe',
-      h: 'Every Ethereum asset, reachable from Cash.',
-      p: "Today, Cash can't hold sUSDe, weETH, USDY, USDS, or Ondo's tokenized stocks. Across closes that gap. The Swap API routes USDC on OP into the target asset on Ethereum, and embedded actions deposit it into ether.fi's Ethereum vault in the same transaction. For permissioned RWAs like Ondo GM stocks, the embedded action invokes the issuer's purchase contract directly from your KYC'd vault.",
+      tag: 'Ondo stocks, first',
+      h: 'TSLAon, AAPLon, NVDAon, in Cash.',
+      p: "Ondo Global Markets is the largest tokenized equity platform onchain. 260+ US stocks and ETFs (Tesla, Apple, Nvidia, Microsoft, S&P 500, Nasdaq 100) all live on Ethereum, behind KYC. ether.fi Cash users can't reach them today because Cash is on Optimism. Across closes the gap: USDC leaves the OP safe via Swap API, settles on Ethereum in ~2 seconds, and a single embedded action invokes Ondo GM's purchase contract from ether.fi's KYC'd Ethereum vault, atomically. The user sees TSLAon in their Cash UI; the vault holds it on their behalf. Same path works for USDY, sUSDe, weETH, USDS, and any other Ethereum-only asset, without the KYC gate.",
     },
     {
       n: '02',
@@ -166,12 +169,124 @@ function Unlock() {
   );
 }
 
+function OndoStocks() {
+  const stocks = [
+    { sym: 'TSLAon', tkr: 'TSLA', name: 'Tesla', color: '#E31937' },
+    { sym: 'AAPLon', tkr: 'AAPL', name: 'Apple', color: '#A2AAAD' },
+    { sym: 'NVDAon', tkr: 'NVDA', name: 'Nvidia', color: '#76B900' },
+    { sym: 'MSFTon', tkr: 'MSFT', name: 'Microsoft', color: '#00A4EF' },
+    { sym: 'GOOGLon', tkr: 'GOOGL', name: 'Alphabet', color: '#4285F4' },
+    { sym: 'AMZNon', tkr: 'AMZN', name: 'Amazon', color: '#FF9900' },
+    { sym: 'METAon', tkr: 'META', name: 'Meta', color: '#1877F2' },
+    { sym: 'SPYon', tkr: 'SPY', name: 'S&P 500 ETF', color: '#1E40AF' },
+    { sym: 'QQQon', tkr: 'QQQ', name: 'Nasdaq 100 ETF', color: '#7C3AED' },
+    { sym: 'IAUon', tkr: 'IAU', name: 'Gold ETF', color: '#D4AF37' },
+    { sym: 'SLVon', tkr: 'SLV', name: 'Silver ETF', color: '#9CA3AF' },
+    { sym: '+249 more', tkr: '...', name: 'and counting', color: '#444' },
+  ];
+
+  const arch = [
+    { n: '01', t: 'USDC leaves OP', d: 'Cash safe debits via Across SpokePool. One user signature.' },
+    { n: '02', t: 'Across settles on ETH', d: 'Relayer fronts USDC on Ethereum, ~2 seconds, UMA-secured.' },
+    { n: '03', t: "ether.fi KYC'd vault", d: "Vault is onboarded with Ondo GM as an approved holder address." },
+    { n: '04', t: 'Vault calls Ondo GM', d: 'Embedded action invokes the purchase contract. TSLAon (or any GM token) minted to the vault.' },
+    { n: '\u2713', t: 'Abstracted in Cash UI', d: 'User sees TSLAon balance. Vault holds custody. Sell/redeem path is the same in reverse.' },
+  ];
+
+  return (
+    <section id="ondo-stocks" className="max-w-6xl mx-auto px-6 py-24">
+      <div className="eyebrow mb-4">Direct answer to ether.fi's ask</div>
+      <h2 className="font-serif text-5xl md:text-6xl gold-text mb-6 max-w-3xl tracking-tightest leading-[1.05]">
+        Yes, Ondo stocks.
+      </h2>
+      <p className="text-cream-300 max-w-3xl mb-12 leading-relaxed text-lg">
+        Shivam called out Ondo stocks specifically. Ondo Global Markets is the largest tokenized
+        equities platform onchain. <span className="text-cream-100">$1.5B TVL, $18B cumulative
+        volume, 70% market share, 260+ stocks and ETFs across Ethereum and BNB Chain.</span> All
+        permissioned, all KYC-gated. The architecture below routes Cash users into any of them
+        from their OP safe, in one signature.
+      </p>
+
+      {/* Stock grid */}
+      <div className="mb-12">
+        <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-4">
+          What ether.fi Cash unlocks via Ondo GM
+        </div>
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
+          {stocks.map((s) => (
+            <div
+              key={s.sym}
+              className="card p-3.5 flex flex-col items-center text-center hover:border-gold-500/30 transition-colors"
+            >
+              <div
+                className="w-12 h-12 rounded-md flex items-center justify-center text-white text-[11px] font-bold tracking-wider mb-2.5"
+                style={{ background: s.color }}
+              >
+                {s.tkr}
+              </div>
+              <div className="text-xs font-semibold text-cream-100 leading-tight">{s.sym}</div>
+              <div className="text-[10px] text-cream-400 mt-0.5 leading-tight">{s.name}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Architecture */}
+      <div className="card-strong p-8">
+        <div className="eyebrow mb-3">How a Cash user buys TSLAon</div>
+        <h3 className="font-serif text-2xl md:text-3xl gold-text mb-7 max-w-2xl tracking-tight">
+          USDC on OP → TSLAon in Cash. One signature. ~2 seconds.
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+          {arch.map((a, i) => (
+            <div key={i} className={`card p-4 ${i === arch.length - 1 ? 'border-gold-500/40' : ''}`}>
+              <div
+                className={`w-9 h-9 rounded-full flex items-center justify-center font-serif text-base mb-3 ${
+                  i === arch.length - 1 ? 'bg-gold-500 text-[#1A140A] font-semibold' : 'bg-bg-600 text-cream-200'
+                }`}
+              >
+                {a.n}
+              </div>
+              <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-1.5">{a.t}</div>
+              <div className="text-xs text-cream-200 leading-relaxed">{a.d}</div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-7 grid grid-cols-1 md:grid-cols-3 gap-3">
+          <div className="rounded-xl bg-bg-700 border border-white/[0.06] p-4">
+            <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-1.5">Why the vault must be KYC'd</div>
+            <div className="text-xs text-cream-200 leading-relaxed">
+              Ondo GM tokens are permissioned. Only allowlisted addresses can hold them. Ondo
+              onboards institutional holders directly; ether.fi's Ethereum vault becomes one.
+            </div>
+          </div>
+          <div className="rounded-xl bg-bg-700 border border-white/[0.06] p-4">
+            <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-1.5">Same path for live yield assets</div>
+            <div className="text-xs text-cream-200 leading-relaxed">
+              The architecture also handles USDY, sUSDe, sDAI, weETH, USDS without the KYC gate.
+              These are quotable via Across Swap API today. PoC demo shows them live.
+            </div>
+          </div>
+          <div className="rounded-xl bg-bg-700 border border-white/[0.06] p-4">
+            <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-1.5">Demo</div>
+            <div className="text-xs text-cream-200 leading-relaxed">
+              <Link href="/cash" className="gold-text hover:underline">Live PoC</Link> opens
+              with TSLAon and the architecture preview. Toggle to USDY for an end-to-end live
+              quote and execution against the production integrator ID.
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function EmbeddedActions() {
   const steps = [
     { i: '1', t: 'Step 1', d: 'User holds USDC in the Cash safe on Optimism.' },
-    { i: '2', t: 'Step 2', d: 'Selects an Ethereum asset (Ondo, sUSDe, weETH, ...).' },
-    { i: '3', t: 'Step 3', d: 'Across routes, fills, and deposits into the Ethereum vault atomically.' },
-    { i: '✓', t: 'Result', d: 'Position live on Ethereum. One signature. Roughly 2s.' },
+    { i: '2', t: 'Step 2', d: 'Selects an Ethereum asset (TSLAon, AAPLon, USDY, sUSDe, weETH, ...).' },
+    { i: '3', t: 'Step 3', d: "Across routes, fills, and the embedded action invokes the vault or Ondo GM contract atomically." },
+    { i: '✓', t: 'Result', d: 'Position live on Ethereum. One signature. ~2s.' },
   ];
   return (
     <section className="max-w-6xl mx-auto px-6 py-24">

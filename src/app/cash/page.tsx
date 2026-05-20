@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useAccount, useChainId, useSendTransaction, useSwitchChain } from 'wagmi';
 import type { AcrossChain, AcrossToken } from '@/lib/tokens';
-import { DEMO_DEST_SYMBOLS, LOCAL_LOGO_OVERRIDES, ORIGIN_USDC, RELIABLE_LOGOS } from '@/lib/tokens';
+import { DEMO_DEST_SYMBOLS, isStock, LOCAL_LOGO_OVERRIDES, ORIGIN_USDC, RELIABLE_LOGOS, STOCK_MOCK_PRICE } from '@/lib/tokens';
 import { formatUnits, friendlyError, parseUnits } from '@/lib/format';
 
 type Quote = {
@@ -38,16 +38,22 @@ type Mode = 'buy' | 'sell';
 
 const SAFE_BALANCE_USDC = 5000;
 
-// Mock Ethereum vault holdings shown in sell mode
+// Mock Ethereum vault holdings shown in sell mode. Stocks are illustrative (real
+// balances would come from on-chain reads of the KYC'd ether.fi Ethereum vault).
 const ETH_VAULT_BALANCES: Record<string, number> = {
+  TSLAon: 0.8,
+  AAPLon: 1.2,
+  NVDAon: 1.5,
+  MSFTon: 0.5,
+  SPYon: 0.4,
+  QQQon: 0.3,
+  USDY: 350,
   sDAI: 850,
   sUSDe: 600,
   USDS: 400,
-  USDY: 350,
   wstETH: 0.45,
   weETH: 0.30,
   USDC: 1200,
-  ONDO: 0,
 };
 
 export default function CashDemo() {
@@ -64,7 +70,7 @@ export default function CashDemo() {
   // Form state
   const [mode, setMode] = useState<Mode>('buy');
   const [amount, setAmount] = useState('100');
-  const [selectedSymbol, setSelectedSymbol] = useState('USDY');
+  const [selectedSymbol, setSelectedSymbol] = useState('TSLAon');
   const [quote, setQuote] = useState<Quote | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
@@ -92,22 +98,39 @@ export default function CashDemo() {
     };
   }, []);
 
-  // Build destination asset options: combine curated metadata with live API token data
+  // Build destination asset options: combine curated metadata with live API token data.
+  // Ondo GM stocks are NOT in Across's whitelist (KYC-gated, permissioned), so we
+  // synthesize a placeholder token for them - they will be shown in the picker but
+  // will render an architecture preview instead of a live quote.
   const destOptions = useMemo(() => {
     return DEMO_DEST_SYMBOLS.map((curated) => {
       const match = destTokens.find(
         (t) => t.symbol.toUpperCase() === curated.symbol.toUpperCase(),
       );
-      return {
-        ...curated,
-        token: match,
-      };
+      if (curated.kind === 'rwa-stock') {
+        return {
+          ...curated,
+          token: match || {
+            chainId: 1,
+            address: '0x0000000000000000000000000000000000000000',
+            name: `${curated.underlying || curated.symbol} (Ondo GM)`,
+            symbol: curated.symbol,
+            decimals: 18,
+          },
+        };
+      }
+      return { ...curated, token: match };
     }).filter((o) => !!o.token);
   }, [destTokens]);
 
   const selectedAsset = useMemo(
     () => destOptions.find((o) => o.symbol === selectedSymbol) || destOptions[0],
     [destOptions, selectedSymbol],
+  );
+
+  const isStockSelected = useMemo(
+    () => isStock(selectedAsset?.symbol || ''),
+    [selectedAsset],
   );
 
   const opChainLogo = useMemo(
@@ -129,7 +152,13 @@ export default function CashDemo() {
   }, [mode]);
 
   // Fetch quote on input change. Direction depends on mode.
+  // Skip for permissioned RWA stocks (Ondo GM) - they show architecture preview instead.
   useEffect(() => {
+    if (isStockSelected) {
+      setQuote(null);
+      setPhase('idle');
+      return;
+    }
     if (!address || !amount || Number(amount) <= 0 || !selectedAsset?.token) {
       setQuote(null);
       setPhase('idle');
@@ -177,7 +206,7 @@ export default function CashDemo() {
       clearTimeout(t);
       ctrl.abort();
     };
-  }, [address, amount, selectedAsset, mode]);
+  }, [address, amount, selectedAsset, mode, isStockSelected]);
 
   const feePct = useMemo(() => {
     const raw = quote?.fees?.total?.pct;
@@ -454,6 +483,20 @@ export default function CashDemo() {
               </div>
             </div>
 
+            {isStockSelected ? (
+              <StockArchitecturePreview
+                symbol={selectedAsset?.symbol || ''}
+                underlying={selectedAsset?.underlying}
+                accentColor={selectedAsset?.accentColor}
+                mode={mode}
+                amount={amount}
+                setAmount={setAmount}
+                opChainLogo={opChainLogo}
+                ethChainLogo={ethChainLogo}
+                onSwitchToUsdy={() => setSelectedSymbol('USDY')}
+              />
+            ) : (
+              <>
             {/* Quote summary */}
             <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
               <QuoteRow label="Route">
@@ -587,6 +630,8 @@ export default function CashDemo() {
                 </div>
               )}
             </div>
+              </>
+            )}
           </section>
 
           {/* Assets list */}
@@ -612,15 +657,23 @@ export default function CashDemo() {
                 highlight
               />
               <AssetRow
-                symbol={selectedAsset?.symbol || 'USDY'}
-                name={selectedAsset?.token?.name || "Ondo USD Yield"}
+                symbol={selectedAsset?.symbol || 'TSLAon'}
+                name={
+                  selectedAsset?.kind === 'rwa-stock'
+                    ? `${selectedAsset.underlying} (Ondo GM)`
+                    : selectedAsset?.token?.name || 'Ondo USD Yield'
+                }
                 chain="Ethereum"
                 chainLogo={ethChainLogo}
                 tokenLogo={
-                  selectedAsset?.symbol
-                    ? LOCAL_LOGO_OVERRIDES[selectedAsset.symbol] || selectedAsset?.token?.logoUrl
-                    : undefined
+                  selectedAsset?.kind === 'rwa-stock'
+                    ? undefined
+                    : selectedAsset?.symbol
+                      ? LOCAL_LOGO_OVERRIDES[selectedAsset.symbol] || selectedAsset?.token?.logoUrl
+                      : undefined
                 }
+                ticker={selectedAsset?.kind === 'rwa-stock' ? selectedAsset.underlying : undefined}
+                tickerColor={selectedAsset?.kind === 'rwa-stock' ? selectedAsset.accentColor : undefined}
                 balance="0.00"
                 usd={0}
                 pending
@@ -628,7 +681,9 @@ export default function CashDemo() {
             </div>
           </section>
 
-          <FlowExplainer asset={selectedAsset?.symbol || ''} mode={mode} />
+          {!isStockSelected && (
+            <FlowExplainer asset={selectedAsset?.symbol || ''} mode={mode} />
+          )}
         </main>
 
         <RightRail />
@@ -767,9 +822,11 @@ function DemoBanner() {
       <div className="text-sm leading-relaxed">
         <span className="font-semibold gold-text">Live PoC.</span>{' '}
         <span className="text-cream-200">
-          This is the ether.fi Cash safe view with a new <em className="not-italic font-semibold">Buy / Sell on Ethereum</em> panel
-          powered by the Across Swap API. Connect a wallet, toggle Buy or Sell, pick an asset, sign once. Quotes are live in both
-          directions; outbound execution settles on Ethereum in roughly 2 seconds, return leg lands USDC back on the Cash safe.
+          Opens with TSLAon selected (Ondo's tokenized Tesla) showing the architecture preview.
+          Ondo GM stocks are permissioned; live execution requires ether.fi's KYC'd Ethereum
+          vault. Switch to USDY (or any yield asset below it) for an end-to-end live quote and
+          execution against the production Across integrator ID. Buy and Sell directions both
+          supported.
         </span>
       </div>
     </div>
@@ -835,16 +892,32 @@ function AssetSelect({
 }: {
   value: string;
   onChange: (s: string) => void;
-  options: Array<{ symbol: string; tag: string; description: string; token?: AcrossToken }>;
+  options: Array<{
+    symbol: string;
+    tag: string;
+    description: string;
+    token?: AcrossToken;
+    kind?: string;
+    underlying?: string;
+    accentColor?: string;
+  }>;
   chainName: string;
   chainLogo?: string;
   loading: boolean;
 }) {
   const selected = options.find((o) => o.symbol === value);
-  const logoUrl = LOCAL_LOGO_OVERRIDES[value] || selected?.token?.logoUrl;
+  const isRwaStock = selected?.kind === 'rwa-stock';
+  const logoUrl = isRwaStock ? null : LOCAL_LOGO_OVERRIDES[value] || selected?.token?.logoUrl;
   return (
     <div className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-xl bg-bg-700 border border-white/[0.08]">
-      {logoUrl ? (
+      {isRwaStock ? (
+        <div
+          className="w-7 h-7 rounded-md flex items-center justify-center text-[9px] font-bold text-white tracking-wider"
+          style={{ background: selected?.accentColor || '#444' }}
+        >
+          {selected?.underlying || selected?.symbol.slice(0, 3)}
+        </div>
+      ) : logoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={logoUrl}
@@ -893,6 +966,8 @@ function AssetRow({
   chain,
   chainLogo,
   tokenLogo,
+  ticker,
+  tickerColor,
   balance,
   usd,
   highlight,
@@ -903,6 +978,8 @@ function AssetRow({
   chain: string;
   chainLogo?: string;
   tokenLogo?: string;
+  ticker?: string;
+  tickerColor?: string;
   balance: string;
   usd: number;
   highlight?: boolean;
@@ -916,7 +993,14 @@ function AssetRow({
     >
       <div className="flex items-center gap-3">
         <div className="relative">
-          {tokenLogo ? (
+          {ticker ? (
+            <div
+              className="w-10 h-10 rounded-md flex items-center justify-center text-white text-[11px] font-bold tracking-wider"
+              style={{ background: tickerColor || '#444' }}
+            >
+              {ticker}
+            </div>
+          ) : tokenLogo ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src={tokenLogo} alt={symbol} className="w-10 h-10 rounded-full" />
           ) : (
@@ -1060,6 +1144,122 @@ function FlowExplainer({ asset, mode }: { asset: string; mode: Mode }) {
         ))}
       </div>
     </div>
+  );
+}
+
+// ============ STOCK ARCHITECTURE PREVIEW ============
+// Shown when a permissioned RWA stock (Ondo GM) is selected. Live execution requires
+// ether.fi's KYC'd Ethereum vault onboarded as an Ondo GM holder. The architecture is
+// identical to USDY (live below), so the live USDY route serves as proof.
+
+function StockArchitecturePreview({
+  symbol,
+  underlying,
+  accentColor,
+  mode,
+  amount,
+  setAmount,
+  opChainLogo,
+  ethChainLogo,
+  onSwitchToUsdy,
+}: {
+  symbol: string;
+  underlying?: string;
+  accentColor?: string;
+  mode: Mode;
+  amount: string;
+  setAmount: (v: string) => void;
+  opChainLogo?: string;
+  ethChainLogo?: string;
+  onSwitchToUsdy: () => void;
+}) {
+  const sharePrice = STOCK_MOCK_PRICE[symbol] || 100;
+  const isBuy = mode === 'buy';
+  const usdAmount = Number(amount) || 0;
+  const shares = isBuy ? usdAmount / sharePrice : usdAmount;
+  const usdValue = isBuy ? usdAmount : shares * sharePrice;
+
+  const buySteps = [
+    { n: '01', title: 'Cash safe debits USDC', sub: `${usdAmount.toLocaleString()} USDC leaves the Optimism Cash safe via Across SpokePool. One user signature.` },
+    { n: '02', title: 'Across settles on Ethereum', sub: 'Relayer fronts USDC on Ethereum in ~2 seconds. Canonical transfer, UMA-secured.' },
+    { n: '03', title: "ether.fi KYC'd vault receives", sub: "USDC lands in ether.fi's Ethereum vault, onboarded with Ondo as an approved holder." },
+    { n: '04', title: `Vault buys ${symbol}`, sub: `Embedded action calls Ondo GM's purchase contract from the vault. ${shares.toFixed(4)} ${symbol} (\u2248$${usdValue.toFixed(2)}) minted to the vault. Atomic.` },
+    { n: '\u2713', title: `${symbol} held, abstracted in Cash`, sub: `User sees ${shares.toFixed(4)} ${underlying || symbol} in their Cash UI. Spendable via card on conversion back to USDC.` },
+  ];
+  const sellSteps = [
+    { n: '01', title: `Vault redeems ${symbol}`, sub: `${shares.toFixed(4)} ${symbol} (\u2248$${usdValue.toFixed(2)}) burned at Ondo GM. USDC returns to the vault on Ethereum.` },
+    { n: '02', title: 'Across deposit, return leg', sub: 'Vault deposits USDC into Across SpokePool on Ethereum.' },
+    { n: '03', title: 'Relayer fills on Optimism', sub: 'USDC lands in the Cash safe on Optimism in ~2 seconds.' },
+    { n: '\u2713', title: 'Spendable on card', sub: `${usdValue.toFixed(2)} USDC now in the OP Cash safe, immediately spendable.` },
+  ];
+  const steps = isBuy ? buySteps : sellSteps;
+
+  return (
+    <>
+      {/* Architecture preview panel - replaces quote summary + action button */}
+      <div className="mt-6 rounded-2xl border border-gold-500/20 bg-gradient-to-br from-gold-500/[0.04] to-transparent p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <div
+            className="w-7 h-7 rounded-md flex items-center justify-center text-[10px] font-bold text-white tracking-wider"
+            style={{ background: accentColor || '#444' }}
+          >
+            {underlying || symbol}
+          </div>
+          <div className="text-[11px] uppercase tracking-widest text-gold-400 font-semibold">
+            Permissioned RWA &middot; Ondo Global Markets
+          </div>
+        </div>
+        <h3 className="font-serif text-xl text-cream-50 leading-snug mb-1.5">
+          {isBuy ? `Buy ${underlying || symbol}, abstracted in Cash` : `Sell ${underlying || symbol} back to OP USDC`}
+        </h3>
+        <p className="text-xs text-cream-400 leading-relaxed mb-5 max-w-2xl">
+          {isBuy
+            ? `${underlying || symbol} lives on Ethereum and requires KYC. ether.fi's Ethereum vault is onboarded with Ondo GM as an approved holder. The user sees ${underlying || symbol} in their Cash UI; the vault holds the position on their behalf. Architecture below; live execution requires the vault deployed and onboarded.`
+            : `${underlying || symbol} is redeemed back to USDC at Ondo GM, then returns to the Cash safe via Across. Same architecture as the buy direction, in reverse.`}
+        </p>
+
+        {/* Step strip */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-2.5">
+          {steps.map((s, i) => (
+            <div key={i} className="rounded-xl bg-bg-700 border border-white/[0.06] p-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <div className={`w-6 h-6 rounded-md flex items-center justify-center text-[10px] font-bold tabular ${
+                  s.n === '\u2713' ? 'bg-gold-500 text-[#1A140A]' : 'bg-bg-500 text-cream-300'
+                }`}>
+                  {s.n}
+                </div>
+                <div className="text-[11px] font-semibold text-cream-100 leading-tight">{s.title}</div>
+              </div>
+              <div className="text-[10.5px] text-cream-400 leading-snug">{s.sub}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* CTA: switch to USDY for live proof */}
+        <div className="mt-5 rounded-xl bg-bg-700/60 border border-white/[0.06] p-4 flex items-start gap-3">
+          <div className="text-gold-400 mt-0.5">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 8v4M12 16h.01" />
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-xs font-semibold text-cream-100 mb-1">
+              Live proof: identical architecture, no KYC gate
+            </div>
+            <div className="text-[11px] text-cream-400 leading-relaxed mb-3">
+              USDY (Ondo's yield USD) uses the same Swap API + MulticallHandler pattern. Switch to USDY to fetch a real Across quote and execute end-to-end against the production integrator ID.
+            </div>
+            <button
+              onClick={onSwitchToUsdy}
+              className="text-[11px] px-3 py-1.5 rounded-lg bg-gold-500 text-[#1A140A] font-semibold hover:bg-gold-400 transition"
+            >
+              Run live demo with USDY &rarr;
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
   );
 }
 
