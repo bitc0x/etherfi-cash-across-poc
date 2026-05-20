@@ -28,7 +28,6 @@ export default async function LandingPage() {
       <Architecture />
       <WhyAcross />
       <TrackRecord />
-      <CostVsAlternatives />
       <Coverage chains={chains} />
       <TrustedBy />
       <Credentials />
@@ -433,111 +432,6 @@ function TrackRecord() {
           </div>
         ))}
       </div>
-    </section>
-  );
-}
-
-function CostVsAlternatives() {
-  const benchRows = [
-    {
-      tag: 'USDC',
-      title: 'Optimism → Ethereum',
-      rows: [
-        { name: 'Across', cost: '$0.014', detail: '1.4 bps · ~2s', badge: 'LOWEST' },
-        { name: 'Relay', cost: '$0.048', detail: '4.8 bps · ~3s', badge: '3.4×' },
-        { name: 'Li.Fi', cost: '$0.241', detail: '24.1 bps · ~4s', badge: 'AGG' },
-        { name: 'deBridge', cost: '$2.87', detail: '287 bps · 30-90s', badge: '205×' },
-      ],
-    },
-    {
-      tag: 'USDC → sDAI',
-      title: 'Optimism → Ethereum',
-      rows: [
-        { name: 'Across', cost: '$0.022', detail: '2.2 bps · ~2s', badge: 'LOWEST' },
-        { name: 'Relay', cost: '$0.064', detail: '6.4 bps · ~3s', badge: '2.9×' },
-        { name: 'Li.Fi', cost: '$0.288', detail: '28.8 bps · ~5s', badge: 'AGG' },
-        { name: 'deBridge', cost: 'Unsupported', detail: '·', badge: '' },
-      ],
-    },
-    {
-      tag: 'USDC → sUSDe',
-      title: 'Optimism → Ethereum',
-      rows: [
-        { name: 'Across', cost: '$0.024', detail: '2.4 bps · ~2s', badge: 'LOWEST' },
-        { name: 'Relay', cost: '$0.071', detail: '7.1 bps · ~3s', badge: '2.96×' },
-        { name: 'Li.Fi', cost: '$0.301', detail: '30.1 bps · ~5s', badge: 'AGG' },
-        { name: 'deBridge', cost: 'Unsupported', detail: '·', badge: '' },
-      ],
-    },
-    {
-      tag: 'USDC → weETH',
-      title: 'Optimism → Ethereum',
-      rows: [
-        { name: 'Across', cost: '$0.026', detail: '2.6 bps · ~2s', badge: 'LOWEST' },
-        { name: 'Relay', cost: '$0.082', detail: '8.2 bps · ~3s', badge: '3.15×' },
-        { name: 'Li.Fi', cost: '$0.295', detail: '29.5 bps · ~5s', badge: 'AGG' },
-        { name: 'deBridge', cost: 'Unsupported', detail: '·', badge: '' },
-      ],
-    },
-  ];
-
-  return (
-    <section className="max-w-6xl mx-auto px-6 py-24">
-      <div className="eyebrow mb-4">Cost vs alternatives</div>
-      <h2 className="font-serif text-5xl md:text-6xl gold-text mb-6 max-w-3xl tracking-tightest leading-[1.05]">
-        Cheapest on every route Cash needs.
-      </h2>
-      <p className="text-cream-300 max-w-3xl mb-14 leading-relaxed">
-        Live benchmark on the routes that matter for Cash: Optimism out to Ethereum, in stablecoins
-        and yield assets. Across is the lowest cost on every one.
-      </p>
-
-      <div className="grid md:grid-cols-2 gap-4">
-        {benchRows.map((row) => (
-          <div key={row.tag} className="card p-7">
-            <div className="flex items-baseline justify-between mb-5 pb-4 border-b border-white/[0.06]">
-              <div>
-                <div className="text-xs uppercase tracking-widest text-cream-400 mb-1">
-                  {row.tag} · $100
-                </div>
-                <div className="text-sm text-cream-200 font-serif text-base">{row.title}</div>
-              </div>
-            </div>
-            <div className="space-y-3">
-              {row.rows.map((r, i) => (
-                <div key={r.name} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2">
-                    <span className={i === 0 ? 'font-semibold text-cream-50' : 'text-cream-300'}>
-                      {r.name}
-                    </span>
-                    {r.badge && (
-                      <span
-                        className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${
-                          r.badge === 'LOWEST'
-                            ? 'bg-gold-500/15 text-gold-400'
-                            : 'bg-bg-500 text-cream-400'
-                        }`}
-                      >
-                        {r.badge}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-right tabular">
-                    <div className={i === 0 ? 'text-cream-50 font-semibold' : 'text-cream-300'}>
-                      {r.cost}
-                    </div>
-                    <div className="text-[11px] text-cream-400">{r.detail}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-      <p className="text-xs text-cream-500 mt-6 leading-relaxed">
-        Source: Across internal benchmark, May 2026. All-in cost includes bridge fee, protocol fee,
-        and price impact. Live quotes against each protocol's public API, normalized to $100 input.
-      </p>
     </section>
   );
 }
