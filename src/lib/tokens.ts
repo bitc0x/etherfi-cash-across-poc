@@ -41,7 +41,7 @@ export const DEMO_DEST_SYMBOLS = [
 // (e.g. black background, or generic placeholder). Keyed by symbol (case-sensitive).
 export const LOCAL_LOGO_OVERRIDES: Record<string, string> = {
   ONDO: '/ondo-logo.png',
-  USDY: '/ondo-logo.png',
+  USDY: '/usdy-logo.png',
 };
 
 // Reliable hardcoded logo URLs for tokens displayed outside the dynamic picker
