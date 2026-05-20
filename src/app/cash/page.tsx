@@ -4,7 +4,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { useAccount, useChainId, useSendTransaction, useSwitchChain } from 'wagmi';
+import { useAccount, useBalance, useChainId, useSendTransaction, useSwitchChain } from 'wagmi';
 import type { AcrossChain, AcrossToken } from '@/lib/tokens';
 import { DEMO_DEST_SYMBOLS, isStock, LOCAL_LOGO_OVERRIDES, ORIGIN_USDC, RELIABLE_LOGOS, STOCK_MOCK_PRICE } from '@/lib/tokens';
 import { formatUnits, friendlyError, parseUnits } from '@/lib/format';
@@ -36,25 +36,29 @@ type Phase =
 
 type Mode = 'buy' | 'sell';
 
-const SAFE_BALANCE_USDC = 5000;
-
-// Mock Ethereum vault holdings shown in sell mode. Stocks are illustrative (real
-// balances would come from on-chain reads of the KYC'd ether.fi Ethereum vault).
-const ETH_VAULT_BALANCES: Record<string, number> = {
+// Mock Ethereum vault holdings shown in Sell mode for permissioned RWA stocks
+// (which can't be queried from chain since they're allowlist-gated). Live assets
+// (USDY, sUSDe, sDAI, weETH, wstETH, USDS, USDC) read real balances via wagmi.
+const STOCK_MOCK_BALANCES: Record<string, number> = {
   TSLAon: 0.8,
   AAPLon: 1.2,
   NVDAon: 1.5,
   GOOGLon: 1.0,
   SPYon: 0.4,
   QQQon: 0.3,
-  USDY: 350,
-  sDAI: 850,
-  sUSDe: 600,
-  USDS: 400,
-  wstETH: 0.45,
-  weETH: 0.30,
-  USDC: 1200,
 };
+
+// Format the Across fee as a dollar amount given the input USD and the fee
+// percentage. feePct is in percent units (e.g. 0.00869 for 0.869 bps).
+function formatFeeUsd(inputUsd: number, feePct: number): string {
+  if (!Number.isFinite(inputUsd) || inputUsd <= 0) return '\u2014';
+  const dollars = inputUsd * (feePct / 100);
+  if (dollars < 0.0001) return '< $0.0001';
+  if (dollars < 0.01) return `$${dollars.toFixed(4)}`;
+  if (dollars < 1) return `$${dollars.toFixed(3)}`;
+  if (dollars < 100) return `$${dollars.toFixed(2)}`;
+  return `$${dollars.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
+}
 
 export default function CashDemo() {
   const { address, isConnected } = useAccount();
@@ -69,7 +73,7 @@ export default function CashDemo() {
 
   // Form state
   const [mode, setMode] = useState<Mode>('buy');
-  const [amount, setAmount] = useState('100');
+  const [amount, setAmount] = useState('');
   const [selectedSymbol, setSelectedSymbol] = useState('TSLAon');
   const [quote, setQuote] = useState<Quote | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
@@ -141,6 +145,35 @@ export default function CashDemo() {
     () => chains.find((c) => c.chainId === 1)?.logoUrl,
     [chains],
   );
+
+  // Live wallet balance reads.
+  // Origin: USDC on Optimism (Cash safe equivalent in this PoC).
+  const { data: usdcOpBalance } = useBalance({
+    address: address as `0x${string}` | undefined,
+    token: ORIGIN_USDC.address as `0x${string}`,
+    chainId: 10,
+    query: { enabled: !!address, refetchInterval: 12000 },
+  });
+  // Destination: selected asset on Ethereum (Sell mode source).
+  // Skipped for stocks (allowlist-gated, can't be held by ordinary wallets) -
+  // those use mock balances.
+  const { data: destAssetBalance } = useBalance({
+    address: address as `0x${string}` | undefined,
+    token: selectedAsset?.token?.address as `0x${string}` | undefined,
+    chainId: 1,
+    query: {
+      enabled: !!address && !!selectedAsset?.token && !isStockSelected,
+      refetchInterval: 12000,
+    },
+  });
+
+  const usdcOpBalanceNum = usdcOpBalance ? Number(usdcOpBalance.formatted) : 0;
+  const destAssetBalanceNum = useMemo(() => {
+    if (isStockSelected && selectedAsset?.symbol) {
+      return STOCK_MOCK_BALANCES[selectedAsset.symbol] ?? 0;
+    }
+    return destAssetBalance ? Number(destAssetBalance.formatted) : 0;
+  }, [destAssetBalance, isStockSelected, selectedAsset]);
 
   // Reset transient state when toggling mode
   useEffect(() => {
@@ -288,7 +321,12 @@ export default function CashDemo() {
   }
 
   const usdAmount = Number(amount || 0);
-  const remainingBalance = Math.max(0, SAFE_BALANCE_USDC - usdAmount);
+  // Total Balance reflects live USDC balance on OP minus the pending Buy amount
+  // (so the demo visually shows the safe being debited in real time as the user types).
+  const remainingBalance = Math.max(
+    0,
+    usdcOpBalanceNum - (mode === 'buy' ? usdAmount : 0),
+  );
 
   return (
     <div className="min-h-screen bg-bg-900">
@@ -421,12 +459,15 @@ export default function CashDemo() {
                       <span>
                         Balance:{' '}
                         <span className="text-cream-200 tabular">
-                          {SAFE_BALANCE_USDC.toLocaleString()} USDC
+                          {isConnected
+                            ? `${usdcOpBalanceNum.toLocaleString(undefined, { maximumFractionDigits: 6 })} USDC`
+                            : 'Connect wallet'}
                         </span>
                       </span>
                       <button
-                        onClick={() => setAmount(String(SAFE_BALANCE_USDC))}
-                        className="px-2 py-0.5 rounded-full border border-white/10 text-cream-300 hover:bg-bg-500"
+                        onClick={() => setAmount(String(usdcOpBalanceNum))}
+                        disabled={!isConnected || usdcOpBalanceNum === 0}
+                        className="px-2 py-0.5 rounded-full border border-white/10 text-cream-300 hover:bg-bg-500 disabled:opacity-40"
                       >
                         Max
                       </button>
@@ -434,16 +475,16 @@ export default function CashDemo() {
                   ) : (
                     <>
                       <span>
-                        Vault balance:{' '}
+                        {isStockSelected ? 'Vault balance' : 'Wallet balance'}:{' '}
                         <span className="text-cream-200 tabular">
-                          {(ETH_VAULT_BALANCES[selectedSymbol] ?? 0).toLocaleString()} {selectedSymbol}
+                          {!isConnected
+                            ? 'Connect wallet'
+                            : `${destAssetBalanceNum.toLocaleString(undefined, { maximumFractionDigits: 6 })} ${selectedSymbol}`}
                         </span>
                       </span>
                       <button
-                        onClick={() =>
-                          setAmount(String(ETH_VAULT_BALANCES[selectedSymbol] ?? 0))
-                        }
-                        disabled={(ETH_VAULT_BALANCES[selectedSymbol] ?? 0) === 0}
+                        onClick={() => setAmount(String(destAssetBalanceNum))}
+                        disabled={!isConnected || destAssetBalanceNum === 0}
                         className="px-2 py-0.5 rounded-full border border-white/10 text-cream-300 hover:bg-bg-500 disabled:opacity-40"
                       >
                         Max
@@ -517,7 +558,7 @@ export default function CashDemo() {
             ) : (
               <>
             {/* Quote summary */}
-            <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="mt-6 grid grid-cols-3 gap-3">
               <QuoteRow label="Route">
                 <span className="flex items-center gap-1.5">
                   {mode === 'buy' ? (
@@ -554,25 +595,38 @@ export default function CashDemo() {
               <QuoteRow label="Settlement">
                 <span className="text-cream-200">~2 seconds</span>
               </QuoteRow>
-              <QuoteRow label="Across fee">
+              <QuoteRow label="Fees">
                 {feePct === null ? (
-                  <span className="text-cream-400">—</span>
+                  <span className="text-cream-400">\u2014</span>
                 ) : isSponsored ? (
                   <span className="px-2 py-0.5 rounded-full bg-gold-500 text-[#1A140A] font-semibold text-[10px] tracking-wider">
-                    SPONSORED · FREE
+                    SPONSORED \u00b7 FREE
                   </span>
-                ) : Math.abs(feePct) < 0.001 ? (
-                  <span className="text-cream-200 tabular">~0.000 bps</span>
                 ) : (
-                  <span className="text-cream-200 tabular">{feePct.toFixed(3)} bps</span>
+                  <span className="text-cream-200 tabular">{formatFeeUsd(usdAmount, feePct)}</span>
                 )}
               </QuoteRow>
-              <QuoteRow label="Destination action">
-                <span className="text-cream-200">
-                  {mode === 'buy' ? 'Vault deposit (atomic)' : 'Safe credit (atomic)'}
-                </span>
-              </QuoteRow>
             </div>
+
+            {/* Recipient disclosure - honest about where funds land in this PoC */}
+            {isConnected && address && (
+              <div className="mt-3 rounded-xl border border-white/[0.05] bg-bg-700/40 px-3.5 py-2.5 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-0.5">
+                    {mode === 'buy' ? 'USDY recipient' : 'USDC recipient'}
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs tabular text-cream-200">
+                      {address.slice(0, 6)}\u2026{address.slice(-4)}
+                    </span>
+                    <span className="text-[10px] text-cream-500">(your wallet)</span>
+                  </div>
+                </div>
+                <div className="text-[10px] text-cream-500 leading-snug text-right max-w-[55%]">
+                  In production this would be the ether.fi {mode === 'buy' ? 'Ethereum vault' : 'Cash safe'} contract.
+                </div>
+              </div>
+            )}
 
             {/* Action */}
             <div className="mt-6">
@@ -693,9 +747,17 @@ export default function CashDemo() {
                 }
                 ticker={selectedAsset?.kind === 'rwa-stock' ? selectedAsset.underlying : undefined}
                 tickerColor={selectedAsset?.kind === 'rwa-stock' ? selectedAsset.accentColor : undefined}
-                balance="0.00"
-                usd={0}
-                pending
+                balance={destAssetBalanceNum.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                usd={
+                  // Stable-equivalents: balance ~= USD. Stocks: balance * price.
+                  // Other (weETH, wstETH): skip USD display.
+                  ['USDC', 'USDY', 'sDAI', 'sUSDe', 'USDS'].includes(selectedAsset?.symbol || '')
+                    ? destAssetBalanceNum
+                    : selectedAsset?.kind === 'rwa-stock'
+                      ? destAssetBalanceNum * (STOCK_MOCK_PRICE[selectedAsset.symbol] || 0)
+                      : 0
+                }
+                pending={destAssetBalanceNum === 0}
               />
             </div>
           </section>
