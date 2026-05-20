@@ -652,37 +652,37 @@ function MoreCollaboration() {
       n: '01',
       eyebrow: 'Deposits',
       title: 'Fund Cash from any token, any chain.',
-      body: "Cash users today must hold USDC on Optimism to fund their safe, which means an extra bridge or swap step from wherever their assets actually live. With the Across Swap API: USDT on Arbitrum, ETH on Mainnet, USDe on Base, USDC on Polygon (any asset on any of 25+ chains) lands as USDC in the Cash safe in ~2 seconds. One signature. Collapses the 'I need to bridge first' onboarding friction.",
+      body: 'Power Cash deposits via the Across Swap API. USDT on Arbitrum, ETH on Mainnet, USDe on Base, any asset on any of 25+ chains lands as USDC in the Cash safe in ~2 seconds. One signature, atomic, cheap.',
     },
     {
       n: '02',
       eyebrow: 'Withdrawals',
       title: 'Exit Cash to any token, any chain.',
-      body: "Today: USDC withdrawals restricted to Optimism. With Across: route exits to any asset on any chain users want to use next. USDC OP into ETH on Arbitrum, DAI on Mainnet, USDS on Base, weETH on Linea, whatever they pick. One signature, ~2s settlement, same security envelope as the deposit leg.",
+      body: 'Cash exits today are restricted to USDC on Optimism. With Across, users withdraw to any asset on any of 25+ chains in one signature, ~2s settlement.',
     },
     {
       n: '03',
       eyebrow: 'Deposit addresses',
       title: 'A funding address per user, on every chain.',
-      body: "Across counterfactual deposit addresses: each Cash user gets a unique address on every supported chain. Anyone (the user, a friend, a CEX, an off-ramp, a payroll system) sends supported tokens to it; Across settles them into the Cash safe automatically. No connect-wallet step. Hyperbeat uses this pattern in production today.",
+      body: "Counterfactual deposit addresses: each Cash user gets a unique funding endpoint on every supported chain. Send from any wallet, CEX, or payroll deposit; Across settles into the Cash safe automatically. No connect-wallet step. Hyperbeat ships this today.",
     },
     {
       n: '04',
       eyebrow: 'Gasless onboarding',
       title: 'No native gas on the origin chain.',
-      body: "Combined with deposit addresses, the user never signs a tx or holds ETH/MATIC/AVAX/etc. on the chain they're funding from. Send straight from a CEX, an exchange wallet, or a payroll deposit. Removes the universal 'why is my deposit stuck' support ticket and the gas-token chicken-and-egg problem for new users.",
+      body: "Paired with deposit addresses, users never sign a tx or hold ETH/MATIC/etc. to fund Cash. Kills the universal 'why is my deposit stuck' onboarding ticket.",
     },
     {
       n: '05',
       eyebrow: 'Card settlement',
       title: 'Swap API behind every Cash card swipe.',
-      body: "When the user holds USDY, sUSDe, weETH, or a tokenized stock (post-Ondo integration), card-swipe triggers an atomic Swap API call: the position settles to USDC just-in-time for the merchant. Always-on yield, spendable anywhere Visa is accepted. Same Swap API primitive that powers the Buy / Sell panel, called server-side at swipe time.",
+      body: "Server-side Swap API call at swipe time converts the user's USDY, sUSDe, weETH, or tokenized stocks to USDC just-in-time for the merchant. Always-on yield, spendable anywhere Visa is accepted.",
     },
     {
       n: '06',
       eyebrow: 'Sponsored routes',
       title: '1:1 slippage-free route of your choice.',
-      body: "Across supports sponsored corridors where the Across fee is set to zero and routed with 1:1 slippage-free pricing for the user. The sponsor (the partner whose users are routing through it) covers the cost as part of their integration economics. Stablecoin issuers and protocols run this today for their highest-volume lanes. ether.fi can pick a route (USDC OP into a specific Ethereum asset, or any other corridor Cash cares most about) and we wire it up jointly.",
+      body: 'Across runs sponsored corridors at zero fee with 1:1 slippage-free pricing for users. Stablecoin issuers do this today on their highest-volume lanes. ether.fi picks any route Cash cares most about and we wire it up jointly.',
     },
   ];
 
