@@ -27,6 +27,7 @@ export default async function LandingPage() {
       <EmbeddedActions />
       <ReturnLeg />
       <Architecture />
+      <PhaseSplit />
       <WhyAcross />
       <TrackRecord />
       <Coverage chains={chains} />
@@ -78,13 +79,12 @@ function Hero() {
         Ondo's tokenized stocks, abstracted in Cash. Both directions.
       </h2>
       <p className="text-lg text-cream-300 max-w-3xl mb-10 leading-relaxed">
-        Cash holds USDC on Optimism. TSLAon, AAPLon, NVDAon, GOOGLon, SPYon, QQQon, and Ondo's
-        260+ tokenized US stocks and ETFs live on Ethereum, behind KYC. Plug in Across and one
-        signature in Cash routes USDC out, settles on Ethereum in ~2 seconds, and atomically
-        invokes Ondo GM's purchase contract from ether.fi's KYC'd Ethereum vault. The user sees
-        their stock in Cash; the vault holds it on their behalf. Same architecture in reverse
-        for redemption. The same plumbing also unlocks USDY, sUSDe, weETH, and anything else
-        Ethereum-only.
+        Cash holds USDC on Optimism. TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, CRCLon and
+        the wider Ondo Global Markets family live on Ethereum. One signature in Cash routes USDC
+        out via the Across SpokePool, settles on Ethereum in ~2 seconds, and atomically routes
+        through Bebop&rsquo;s RFQ network into Ondo&rsquo;s tokenized stocks. Zero slippage on the
+        RFQ leg, no vault to deploy, no Ondo onboarding required. The same plumbing also covers
+        USDY, sUSDe, weETH, and anything else Ethereum-only.
       </p>
       <div className="flex flex-wrap gap-3">
         <Link href="/cash" className="btn-gold">
@@ -127,13 +127,13 @@ function Unlock() {
       n: '01',
       tag: 'Ondo stocks, first',
       h: 'TSLAon, AAPLon, NVDAon, in Cash.',
-      p: "Ondo Global Markets is the largest tokenized equity platform onchain. 260+ US stocks and ETFs (Tesla, Apple, Nvidia, Google, S&P 500, Nasdaq 100) all live on Ethereum, behind KYC. ether.fi Cash users can't reach them today because Cash is on Optimism. Across closes the gap: USDC leaves the OP safe via Swap API, settles on Ethereum in ~2 seconds, and a single embedded action invokes Ondo GM's purchase contract from ether.fi's KYC'd Ethereum vault, atomically. The user sees TSLAon in their Cash UI; the vault holds it on their behalf. Same path works for USDY, sUSDe, weETH, USDS, and any other Ethereum-only asset, without the KYC gate.",
+      p: "Ondo Global Markets is the largest tokenized equity platform onchain. 260+ US stocks and ETFs all live on Ethereum. ether.fi Cash users can't reach them today because Cash is on Optimism. Across closes the gap: USDC leaves the OP safe via the Swap API, settles on Ethereum at the MulticallHandler in ~2 seconds, and a single embedded action routes through Bebop's RFQ network into the requested Ondo GM token. The MM is already an Ondo-approved holder. Zero slippage on the RFQ leg, atomic with the deposit, recipient is ether.fi's choice (user wallet or Cash safe contract). Same path covers USDY, sUSDe, weETH, USDS, and any other Ethereum-only asset, no KYC gate.",
     },
     {
       n: '02',
       tag: 'Single signature',
       h: 'One tx. No manual bridge. No leaving Cash.',
-      p: 'User signs once. Across settles in roughly 2 seconds, deposits into the destination vault atomically. Return leg is symmetric: vault sells, USDC lands back in the OP safe. Same card, same session, same brand.',
+      p: 'User signs once. Across settles in roughly 2 seconds, the destination action executes atomically inside the same fill. Return leg is symmetric: user sells, USDC lands back in the OP safe. Same card, same session, same brand.',
     },
     {
       n: '03',
@@ -149,9 +149,9 @@ function Unlock() {
         One safe on Optimism. Every yield-bearing asset on Ethereum.
       </h2>
       <p className="text-cream-300 max-w-2xl mb-14 leading-relaxed">
-        Wire the Across Swap API into the Cash safe. No second product, no manual bridge UX. Cash
-        users sell USDC on OP, buy any Ethereum asset, and the deposit lands in their Ethereum
-        vault as a single transaction.
+        Wire the Across Swap API and MulticallHandler into the Cash safe. No second product, no
+        manual bridge UX. Cash users sell USDC on OP, buy any Ethereum asset, and delivery happens
+        in the same transaction.
       </p>
 
       <div className="grid md:grid-cols-3 gap-5">
@@ -171,27 +171,29 @@ function Unlock() {
 }
 
 function OndoStocks() {
+  // Order: 7 Bebop-buyable Ondo GM tickers (live end-to-end today) first, then preview-only stocks.
+  // 'live' marks the ones with confirmed Bebop secondary-market buy-side coverage.
   const stocks = [
-    { sym: 'TSLAon', tkr: 'TSLA', name: 'Tesla', color: '#E31937' },
-    { sym: 'AAPLon', tkr: 'AAPL', name: 'Apple', color: '#A2AAAD' },
-    { sym: 'NVDAon', tkr: 'NVDA', name: 'Nvidia', color: '#76B900' },
-    { sym: 'GOOGLon', tkr: 'GOOGL', name: 'Alphabet', color: '#4285F4' },
-    { sym: 'SPYon', tkr: 'SPY', name: 'S&P 500 ETF', color: '#1E40AF' },
-    { sym: 'QQQon', tkr: 'QQQ', name: 'Nasdaq 100 ETF', color: '#7C3AED' },
-    { sym: 'NFLXon', tkr: 'NFLX', name: 'Netflix', color: '#E50914' },
-    { sym: 'BABAon', tkr: 'BABA', name: 'Alibaba', color: '#FF6A00' },
-    { sym: 'CRCLon', tkr: 'CRCL', name: 'Circle', color: '#00B8B0' },
-    { sym: 'SLVon', tkr: 'SLV', name: 'Silver ETF', color: '#9CA3AF' },
-    { sym: 'COPXon', tkr: 'COPX', name: 'Copper ETF', color: '#B45309' },
-    { sym: '+249 more', tkr: '...', name: 'and counting', color: '#444' },
+    { sym: 'TSLAon', tkr: 'TSLA', name: 'Tesla', color: '#E31937', live: true },
+    { sym: 'NVDAon', tkr: 'NVDA', name: 'Nvidia', color: '#76B900', live: true },
+    { sym: 'GOOGLon', tkr: 'GOOGL', name: 'Alphabet', color: '#4285F4', live: true },
+    { sym: 'COINon', tkr: 'COIN', name: 'Coinbase', color: '#0052FF', live: true },
+    { sym: 'HOODon', tkr: 'HOOD', name: 'Robinhood', color: '#00C805', live: true },
+    { sym: 'MSTRon', tkr: 'MSTR', name: 'MicroStrategy', color: '#F7931A', live: true },
+    { sym: 'CRCLon', tkr: 'CRCL', name: 'Circle', color: '#1FAB44', live: true },
+    { sym: 'AAPLon', tkr: 'AAPL', name: 'Apple', color: '#A2AAAD', live: false },
+    { sym: 'SPYon', tkr: 'SPY', name: 'S&P 500 ETF', color: '#1E40AF', live: false },
+    { sym: 'QQQon', tkr: 'QQQ', name: 'Nasdaq 100 ETF', color: '#7C3AED', live: false },
+    { sym: 'NFLXon', tkr: 'NFLX', name: 'Netflix', color: '#E50914', live: false },
+    { sym: '+250 more', tkr: '...', name: 'and counting', color: '#444', live: false },
   ];
 
   const arch = [
     { n: '01', t: 'USDC leaves OP', d: 'Cash safe debits via Across SpokePool. One user signature.' },
-    { n: '02', t: 'Across settles on ETH', d: 'Relayer fronts USDC on Ethereum, ~2 seconds, UMA-secured.' },
-    { n: '03', t: "ether.fi KYC'd vault", d: "Vault is onboarded with Ondo GM as an approved holder address." },
-    { n: '04', t: 'Vault calls Ondo GM', d: 'Embedded action invokes the purchase contract. TSLAon (or any GM token) minted to the vault.' },
-    { n: '\u2713', t: 'Abstracted in Cash UI', d: 'User sees TSLAon balance. Vault holds custody. Sell/redeem path is the same in reverse.' },
+    { n: '02', t: 'Across settles on ETH', d: 'Relayer fronts USDC to the MulticallHandler in ~2 seconds, UMA-secured.' },
+    { n: '03', t: 'MulticallHandler routes', d: 'Approves the destination liquidity source and executes the swap atomically inside the same fill. Across never holds funds.' },
+    { n: '04', t: 'Bebop RFQ delivers', d: 'Pre-signed maker order fills at the quoted amount. Zero slippage. TSLAon transferred to the recipient on Ethereum.' },
+    { n: '\u2713', t: 'Abstracted in Cash UI', d: 'User sees TSLAon balance. Recipient is ether.fi\u2019s choice: user wallet or Cash safe. Sell path is symmetric.' },
   ];
 
   return (
@@ -201,24 +203,35 @@ function OndoStocks() {
         Yes, Ondo stocks.
       </h2>
       <p className="text-cream-300 max-w-3xl mb-12 leading-relaxed text-lg">
-        Shivam called out Ondo stocks specifically. Ondo Global Markets is the largest tokenized
-        equities platform onchain. <span className="text-cream-100">$1.5B TVL, $18B cumulative
-        volume, 70% market share, 260+ stocks and ETFs across Ethereum and BNB Chain.</span> All
-        permissioned, all KYC-gated. The architecture below routes Cash users into any of them
-        from their OP safe, in one signature.
+        Ondo Global Markets is the largest tokenized equities platform onchain.{' '}
+        <span className="text-cream-100">$1.5B TVL, $18B cumulative volume, 70% market share,
+        260+ stocks and ETFs across Ethereum and BNB Chain.</span> The architecture below routes
+        Cash users into any covered Ondo GM token from their OP safe, in one signature. Seven
+        tickers are end-to-end executable today via Across + Bebop RFQ &mdash; we&rsquo;ve already
+        run a live mainnet TSLAon purchase.
       </p>
 
       {/* Stock grid */}
       <div className="mb-12">
-        <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-4">
-          What ether.fi Cash unlocks via Ondo GM
+        <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-4 flex items-center gap-3">
+          <span>What ether.fi Cash unlocks via Ondo GM</span>
+          <span className="px-2 py-0.5 rounded-full bg-gold-500/15 border border-gold-500/30 text-gold-300 text-[9px] font-semibold tracking-wider">
+            LIVE = executable today
+          </span>
         </div>
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2.5">
           {stocks.map((s) => (
             <div
               key={s.sym}
-              className="card p-3.5 flex flex-col items-center text-center hover:border-gold-500/30 transition-colors"
+              className={`card p-3.5 flex flex-col items-center text-center hover:border-gold-500/30 transition-colors relative ${
+                s.live ? 'border-gold-500/20' : ''
+              }`}
             >
+              {s.live && (
+                <span className="absolute top-1.5 right-1.5 px-1.5 py-0.5 rounded-full bg-gold-500 text-[#1A140A] text-[8px] font-bold tracking-wider">
+                  LIVE
+                </span>
+              )}
               <div
                 className="w-12 h-12 rounded-md flex items-center justify-center text-white text-[11px] font-bold tracking-wider mb-2.5"
                 style={{ background: s.color }}
@@ -255,25 +268,26 @@ function OndoStocks() {
         </div>
         <div className="mt-7 grid grid-cols-1 md:grid-cols-3 gap-3">
           <div className="rounded-xl bg-bg-700 border border-white/[0.06] p-4">
-            <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-1.5">Why the vault must be KYC'd</div>
+            <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-1.5">Why no onboarding is needed</div>
             <div className="text-xs text-cream-200 leading-relaxed">
-              Ondo GM tokens are permissioned. Only allowlisted addresses can hold them. Ondo
-              onboards institutional holders directly; ether.fi's Ethereum vault becomes one.
+              Bebop&rsquo;s market makers are themselves Ondo-approved holders. ether.fi inherits
+              compliance at the MM layer instead of having to deploy and onboard a vault. Zero
+              infrastructure lift; ship today.
             </div>
           </div>
           <div className="rounded-xl bg-bg-700 border border-white/[0.06] p-4">
             <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-1.5">Same path for live yield assets</div>
             <div className="text-xs text-cream-200 leading-relaxed">
-              The architecture also handles USDY, sUSDe, sDAI, weETH, USDS without the KYC gate.
-              These are quotable via Across Swap API today. PoC demo shows them live.
+              The architecture also handles USDY, sUSDe, sDAI, weETH, USDS without any RFQ
+              layer. These are quotable via Across Swap API directly. PoC demo shows them live.
             </div>
           </div>
           <div className="rounded-xl bg-bg-700 border border-white/[0.06] p-4">
             <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-1.5">Demo</div>
             <div className="text-xs text-cream-200 leading-relaxed">
-              <Link href="/cash" className="gold-text hover:underline">Live PoC</Link> opens
-              with TSLAon and the architecture preview. Toggle to USDY for an end-to-end live
-              quote and execution against the production integrator ID.
+              <Link href="/cash" className="gold-text hover:underline">Live PoC</Link> opens with
+              TSLAon. Click Buy for an end-to-end execution against the production Across
+              integrator ID. Mainnet tx hashes available on request.
             </div>
           </div>
         </div>
@@ -285,8 +299,8 @@ function OndoStocks() {
 function EmbeddedActions() {
   const steps = [
     { i: '1', t: 'Step 1', d: 'User holds USDC in the Cash safe on Optimism.' },
-    { i: '2', t: 'Step 2', d: 'Selects an Ethereum asset (TSLAon, AAPLon, USDY, sUSDe, weETH, ...).' },
-    { i: '3', t: 'Step 3', d: "Across routes, fills, and the embedded action invokes the vault or Ondo GM contract atomically." },
+    { i: '2', t: 'Step 2', d: 'Selects an Ethereum asset (TSLAon, NVDAon, USDY, sUSDe, weETH, ...).' },
+    { i: '3', t: 'Step 3', d: 'Across routes, fills, and the embedded action executes the destination swap atomically inside the same fill.' },
     { i: '✓', t: 'Result', d: 'Position live on Ethereum. One signature. ~2s.' },
   ];
   return (
@@ -294,11 +308,12 @@ function EmbeddedActions() {
       <div className="card-strong p-8 md:p-12">
         <div className="eyebrow mb-4">Embedded actions</div>
         <h2 className="font-serif text-4xl md:text-5xl gold-text mb-6 max-w-2xl tracking-tightest leading-[1.05]">
-          One signature in Cash. Deposit on Ethereum.
+          One signature in Cash. Delivered on Ethereum.
         </h2>
         <p className="text-cream-300 max-w-2xl mb-12 leading-relaxed">
-          Across destination actions let a user on OP deposit straight into an Ethereum vault in
-          one transaction. No second approval. No idle capital. No bridge UX to maintain.
+          Across destination actions let a user on OP execute an arbitrary call on Ethereum in
+          one transaction. No second approval. No idle capital. No bridge UX to maintain. For
+          Ondo GM we wire it to Bebop RFQ; the same primitive handles any Ethereum-side action.
         </p>
 
         <div className="grid md:grid-cols-4 gap-4">
@@ -330,11 +345,11 @@ function ReturnLeg() {
   const outbound = [
     'USDC leaves the Cash safe on OP.',
     'Across relayer fills on Ethereum (~2s).',
-    'MulticallHandler swaps and deposits into the ether.fi Ethereum vault.',
+    'MulticallHandler approves and routes through Bebop RFQ. Ondo GM token delivered to recipient.',
   ];
   const inbound = [
-    'User triggers sell from the ether.fi Ethereum vault.',
-    'Vault unwinds the position; MulticallHandler routes proceeds through Across.',
+    'User signs a sell of the Ondo GM token on Ethereum.',
+    'Across Swap API routes the return leg; relayer fronts USDC on Optimism.',
     'USDC lands in the Cash safe on Optimism.',
   ];
   return (
@@ -344,9 +359,9 @@ function ReturnLeg() {
         And back again. Same architecture, opposite direction.
       </h2>
       <p className="text-cream-300 max-w-2xl mb-14 leading-relaxed">
-        Same Swap API, same MulticallHandler, same settlement guarantees. When a Cash user wants to
-        liquidate an Ethereum-side position back to USDC on their OP safe, the call is identical
-        with input and output reversed. No second integration to build, no separate UX.
+        Same Swap API, same MulticallHandler, same settlement guarantees. When a Cash user wants
+        to liquidate an Ethereum-side position back to USDC on their OP safe, the call is
+        identical with input and output reversed. No second integration to build, no separate UX.
       </p>
 
       <div className="card-strong p-8 md:p-10">
@@ -354,11 +369,11 @@ function ReturnLeg() {
           <div>
             <div className="flex items-center gap-2 mb-5">
               <div className="w-7 h-7 rounded-full bg-gold-500 text-[#1A140A] flex items-center justify-center font-serif text-base font-semibold">
-                ↑
+                &uarr;
               </div>
-              <div className="font-serif text-2xl text-cream-50">Outbound · Buy</div>
+              <div className="font-serif text-2xl text-cream-50">Outbound &middot; Buy</div>
             </div>
-            <div className="text-sm text-cream-400 mb-5">Cash safe on OP → Ethereum vault</div>
+            <div className="text-sm text-cream-400 mb-5">Cash safe on OP &rarr; recipient on Ethereum</div>
             <ol className="space-y-3 text-sm text-cream-200">
               {outbound.map((step, i) => (
                 <li key={i} className="flex gap-3">
@@ -374,11 +389,11 @@ function ReturnLeg() {
           <div className="md:border-l md:border-white/[0.06] md:pl-8">
             <div className="flex items-center gap-2 mb-5">
               <div className="w-7 h-7 rounded-full bg-bg-500 text-cream-200 flex items-center justify-center font-serif text-base font-semibold border border-gold-400/40">
-                ↓
+                &darr;
               </div>
-              <div className="font-serif text-2xl text-cream-50">Return · Sell</div>
+              <div className="font-serif text-2xl text-cream-50">Return &middot; Sell</div>
             </div>
-            <div className="text-sm text-cream-400 mb-5">Ethereum vault → Cash safe on OP</div>
+            <div className="text-sm text-cream-400 mb-5">Ethereum holdings &rarr; Cash safe on OP</div>
             <ol className="space-y-3 text-sm text-cream-200">
               {inbound.map((step, i) => (
                 <li key={i} className="flex gap-3">
@@ -411,16 +426,17 @@ function ReturnLeg() {
 
 function Architecture() {
   const ethfi = [
-    'Ethereum vault contract',
+    'Recipient choice: Cash safe contract or user wallet',
     'UI abstraction across both safes',
-    'KYC routing for permissioned assets',
     'Position accounting and yield display',
+    'Optional vault for Phase 2 primary-mint depth',
   ];
   const across = [
     'Cross-chain routing and swap execution',
     '40+ independent relayers',
     'SpokePool contracts, audited',
     'MulticallHandler for embedded actions',
+    'Bebop RFQ routing for Ondo GM tokens',
     'Settlement via UMA optimistic oracle',
     'Fill confirmation and status indexing',
     'Quote API with live pricing',
@@ -454,7 +470,7 @@ function Architecture() {
             ))}
           </ul>
           <div className="mt-6 pt-6 border-t border-white/[0.06] text-xs text-cream-400 leading-relaxed">
-            Four contracts and a UI. Familiar territory.
+            UI work + a recipient address. Phase 1 ships in days.
           </div>
         </div>
 
@@ -472,7 +488,97 @@ function Architecture() {
             ))}
           </ul>
           <div className="mt-6 pt-6 border-t border-gold-500/15 text-xs gold-text leading-relaxed">
-            Ten layers of cross-chain infrastructure. Live, audited, $35B+ proven.
+            Eleven layers of cross-chain infrastructure. Live, audited, $35B+ proven.
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PhaseSplit() {
+  const phase1 = [
+    'Seven Ondo GM tickers live end-to-end on mainnet (TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, CRCLon).',
+    'Zero infrastructure on ether.fi side. No vault to deploy. No Ondo onboarding to schedule.',
+    'Atomic in one signature. ~2 seconds end-to-end. Zero slippage on the RFQ leg.',
+    'Bebop\u2019s market makers are already Ondo-approved holders. Compliance inherited at the MM layer.',
+    'ether.fi-side lift: UI work plus picking a recipient address (user wallet or Cash safe).',
+  ];
+  const phase2 = [
+    'Unlocks the remaining ~250 Ondo GM tickers via primary mint (AAPLon, SPYon, QQQon, NFLXon, BABAon, SLVon, COPXon and the long tail).',
+    'Unlocks whale-size primary-mint depth above Bebop\u2019s MM inventory ceilings.',
+    'ether.fi deploys a vault contract on Ethereum and gets it onboarded with Ondo GM as an approved holder.',
+    'Same Across + MulticallHandler primitives; the destination action just points at Ondo\u2019s purchase contract instead of Bebop.',
+    'Worth investing in once Phase 1 traction warrants it.',
+  ];
+
+  return (
+    <section className="max-w-6xl mx-auto px-6 py-24">
+      <div className="eyebrow mb-4">Rollout</div>
+      <h2 className="font-serif text-5xl md:text-6xl gold-text mb-6 max-w-3xl tracking-tightest leading-[1.05]">
+        Phase 1 today. Phase 2 when it makes sense.
+      </h2>
+      <p className="text-cream-300 max-w-3xl mb-12 leading-relaxed text-lg">
+        Phase 1 ships in days, requires no infrastructure on ether.fi&rsquo;s side, and covers
+        the seven most-traded Ondo GM tickers. Phase 2 is an optional upgrade that adds primary
+        mint depth and full ticker coverage. The two are independent: Phase 1 doesn&rsquo;t
+        block Phase 2 and vice versa.
+      </p>
+
+      <div className="grid md:grid-cols-2 gap-5">
+        {/* Phase 1 — gold-accented, "LIVE TODAY" */}
+        <div className="card p-8 border-gold-500/30 bg-gold-500/[0.03] flex flex-col">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <div className="font-serif text-4xl gold-text tabular leading-none">01</div>
+              <div>
+                <div className="text-[11px] uppercase tracking-widest gold-text font-semibold">Phase 1</div>
+                <div className="font-serif text-xl text-cream-50 leading-tight">Bebop RFQ path</div>
+              </div>
+            </div>
+            <span className="px-2 py-0.5 rounded-full bg-gold-500 text-[#1A140A] font-semibold text-[10px] tracking-wider">
+              LIVE TODAY
+            </span>
+          </div>
+          <ul className="space-y-3 flex-1">
+            {phase1.map((item) => (
+              <li key={item} className="flex gap-3 text-sm text-cream-200">
+                <span className="text-gold-400 mt-1 flex-shrink-0">&#9670;</span>
+                <span className="leading-relaxed">{item}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-6 pt-6 border-t border-gold-500/15">
+            <Link href="/cash" className="text-xs gold-text hover:underline font-semibold">
+              Run the live demo &rarr;
+            </Link>
+          </div>
+        </div>
+
+        {/* Phase 2 — subtler, "FUTURE UPGRADE" */}
+        <div className="card p-8 flex flex-col">
+          <div className="flex items-center justify-between mb-5">
+            <div className="flex items-center gap-3">
+              <div className="font-serif text-4xl text-cream-300 tabular leading-none">02</div>
+              <div>
+                <div className="text-[11px] uppercase tracking-widest text-cream-400 font-semibold">Phase 2</div>
+                <div className="font-serif text-xl text-cream-50 leading-tight">Vault + Ondo onboarding</div>
+              </div>
+            </div>
+            <span className="px-2 py-0.5 rounded-full border border-white/15 text-cream-400 text-[10px] tracking-wider">
+              OPTIONAL UPGRADE
+            </span>
+          </div>
+          <ul className="space-y-3 flex-1">
+            {phase2.map((item) => (
+              <li key={item} className="flex gap-3 text-sm text-cream-200">
+                <span className="text-cream-500 mt-1 flex-shrink-0">&#9670;</span>
+                <span className="leading-relaxed">{item}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-6 pt-6 border-t border-white/[0.06] text-xs text-cream-400 leading-relaxed">
+            Decide based on Phase 1 traction and the volume profile Cash actually sees.
           </div>
         </div>
       </div>
@@ -693,9 +799,10 @@ function MoreCollaboration() {
         Across can power more of Cash.
       </h2>
       <p className="text-cream-300 max-w-3xl mb-12 leading-relaxed text-lg">
-        Ondo stocks is the headline ask. Once the Swap API and KYC'd vault primitives are in
-        place, the same plumbing extends across the rest of the Cash product. Each one of
-        these is independently shippable. We'd love to discuss any of them on our call.
+        Ondo stocks is the headline ask, and it&rsquo;s live today via Across + Bebop RFQ. The
+        same Swap API and MulticallHandler plumbing extends across the rest of the Cash product.
+        Each path below is independently shippable. We&rsquo;d love to discuss any of them on
+        our call.
       </p>
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
         {paths.map((p) => (
