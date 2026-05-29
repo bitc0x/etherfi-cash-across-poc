@@ -1137,11 +1137,13 @@ function DemoBanner() {
       <div className="text-sm leading-relaxed">
         <span className="font-semibold gold-text">Live PoC.</span>{' '}
         <span className="text-cream-200">
-          Opens with TSLAon selected (Ondo&rsquo;s tokenized Tesla). For TSLAon, NVDAon, GOOGLon,
-          COINon, HOODon, MSTRon, CRCLon the Buy button executes end-to-end on mainnet through
-          Across + Bebop RFQ atomically (~2s, zero slippage on the RFQ leg). AAPLon, SPYon, QQQon
-          render the architecture preview only (awaiting Bebop coverage). USDY and the live yield
-          assets below use the vanilla Across Swap API path. Buy and Sell both supported.
+          This is Path A executing on mainnet. Opens with TSLAon selected (Ondo&rsquo;s tokenized
+          Tesla). For TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, CRCLon the Buy button
+          executes end-to-end on mainnet through Across + Bebop RFQ atomically (~2s, zero
+          slippage on the RFQ leg). AAPLon, SPYon, QQQon render the architecture preview only
+          (awaiting Bebop coverage). USDY and the live yield assets below use the vanilla
+          Across Swap API path. Production integrators should use Across&rsquo;s /swap/approval
+          with an actions[] array; see scripts/path-a-reference.ts in the repo.
         </span>
       </div>
     </div>

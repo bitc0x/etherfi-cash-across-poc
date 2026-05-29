@@ -28,7 +28,7 @@ export default async function LandingPage() {
       <EmbeddedActions />
       <ReturnLeg />
       <Architecture />
-      <PhaseSplit />
+      <PathRoadmap />
       <WhyAcross />
       <TrackRecord />
       <Coverage chains={chains} />
@@ -140,10 +140,12 @@ function LiveReceipt() {
           Already executing on mainnet.
         </h2>
         <p className="text-cream-300 max-w-3xl mb-7 leading-relaxed">
-          Phase 1 isn&rsquo;t a pitch. The Across + Bebop RFQ + MulticallHandler path was
+          Path A isn&rsquo;t a pitch. The Across + Bebop RFQ + MulticallHandler chain was
           executed end-to-end on Ethereum mainnet from a Cash-style USDC-on-Optimism flow.
           USDC routed atomically into TSLAon, delivered directly to the recipient on Ethereum.
-          One signature, ~2 seconds, zero slippage on the RFQ leg.
+          One signature, ~2 seconds, zero slippage on the RFQ leg. The same path covers six
+          other Ondo GM tickers today and is reachable via Across&rsquo;s existing /swap/approval
+          actions API, no Across-side changes required.
         </p>
 
         {/* Receipt summary: input -> output flow */}
@@ -578,53 +580,62 @@ function Architecture() {
   );
 }
 
-function PhaseSplit() {
-  const phase1 = [
-    'Seven Ondo GM tickers live end-to-end on mainnet (TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, CRCLon).',
-    'Zero infrastructure on ether.fi side. No vault to deploy. No Ondo onboarding to schedule.',
-    'Atomic in one signature. ~2 seconds end-to-end. Zero slippage on the RFQ leg.',
-    'Bebop\u2019s market makers are already Ondo-approved holders. Compliance inherited at the MM layer.',
-    'ether.fi-side lift: UI work plus picking a recipient address (user wallet or Cash safe).',
+function PathRoadmap() {
+  const pathA = [
+    'ether.fi fetches a Bebop RFQ quote, parses tx.data, and maps it into Across\u2019s /swap/approval actions parameter.',
+    'Zero Across-side work. Uses the existing Swap API schema. No legal review on the Across side because nothing new is being added.',
+    '~2-3 days of focused dev work on ether.fi\u2019s side. Reference implementation lives in this repo (scripts/path-a-reference.ts).',
+    'Covers seven Ondo GM tickers live on Bebop today: TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, CRCLon.',
+    'Mainnet tx hashes already prove the architecture works end-to-end.',
   ];
-  const phase2 = [
-    'Unlocks the remaining ~250 Ondo GM tickers via primary mint (AAPLon, SPYon, QQQon, NFLXon, BABAon, SLVon, COPXon and the long tail).',
-    'Unlocks whale-size primary-mint depth above Bebop\u2019s MM inventory ceilings.',
-    'ether.fi deploys a vault contract on Ethereum and gets it onboarded with Ondo GM as an approved holder.',
-    'Same Across + MulticallHandler primitives; the destination action just points at Ondo\u2019s purchase contract instead of Bebop.',
-    'Worth investing in once Phase 1 traction warrants it.',
+  const pathB = [
+    'Bebop is added as a first-class source within the Across Swap API.',
+    'ether.fi\u2019s integration becomes simpler: /swap/approval returns Bebop-routed transactions directly, no mapping required on the integrator side.',
+    'Subject to Across\u2019s internal product and legal review. Timeline depends on those processes, not engineering effort.',
+    'Same on-chain primitives as Path A, materially better DX.',
+    'A natural upgrade once Path A volume justifies the investment.',
+  ];
+  const pathC = [
+    'Unlocks the remaining ~250 Ondo GM tickers via primary mint (AAPLon, SPYon, QQQon, NFLXon, BABAon, SLVon, COPXon, and the long tail).',
+    'Unlocks whale-size primary-mint depth above Bebop\u2019s market-maker inventory ceilings.',
+    'ether.fi deploys a vault contract on Ethereum and gets it onboarded with Ondo as an approved holder.',
+    'Same Across + MulticallHandler primitives; the destination action just calls Ondo\u2019s purchase contract instead of Bebop.',
+    'Worth investing in once Path A traction warrants it.',
   ];
 
   return (
     <section className="max-w-6xl mx-auto px-6 py-24">
       <div className="eyebrow mb-4">Rollout</div>
       <h2 className="font-serif text-5xl md:text-6xl gold-text mb-6 max-w-3xl tracking-tightest leading-[1.05]">
-        Phase 1 today. Phase 2 when it makes sense.
+        Three paths. Ship now, expand later.
       </h2>
       <p className="text-cream-300 max-w-3xl mb-12 leading-relaxed text-lg">
-        Phase 1 ships in days, requires no infrastructure on ether.fi&rsquo;s side, and covers
-        the seven most-traded Ondo GM tickers. Phase 2 is an optional upgrade that adds primary
-        mint depth and full ticker coverage. The two are independent: Phase 1 doesn&rsquo;t
-        block Phase 2 and vice versa.
+        Path A is live today and requires zero Across-side work. Path B is a future improvement
+        to Across&rsquo;s Swap API. Path C is the long-term ticker expansion. The three are
+        independent: A doesn&rsquo;t block B, B doesn&rsquo;t block C, and Phase 1 ships either
+        way.
       </p>
 
-      <div className="grid md:grid-cols-2 gap-5">
-        {/* Phase 1: gold-accented, LIVE TODAY */}
-        <div className="card p-8 border-gold-500/30 bg-gold-500/[0.03] flex flex-col">
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-3">
-              <div className="font-serif text-4xl gold-text tabular leading-none">01</div>
-              <div>
-                <div className="text-[11px] uppercase tracking-widest gold-text font-semibold">Phase 1</div>
-                <div className="font-serif text-xl text-cream-50 leading-tight">Bebop RFQ path</div>
+      <div className="grid md:grid-cols-3 gap-5">
+        {/* Path A: gold-accented, LIVE NOW */}
+        <div className="card p-7 border-gold-500/30 bg-gold-500/[0.03] flex flex-col">
+          <div className="flex items-start justify-between mb-5 gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="font-serif text-4xl gold-text tabular leading-none flex-shrink-0">A</div>
+              <div className="min-w-0">
+                <div className="text-[11px] uppercase tracking-widest gold-text font-semibold">Path A</div>
+                <div className="font-serif text-lg text-cream-50 leading-tight">
+                  ether.fi maps Bebop into Across actions
+                </div>
               </div>
             </div>
-            <span className="px-2 py-0.5 rounded-full bg-gold-500 text-[#1A140A] font-semibold text-[10px] tracking-wider">
-              LIVE TODAY
+            <span className="px-2 py-0.5 rounded-full bg-gold-500 text-[#1A140A] font-semibold text-[10px] tracking-wider flex-shrink-0">
+              LIVE NOW
             </span>
           </div>
           <ul className="space-y-3 flex-1">
-            {phase1.map((item) => (
-              <li key={item} className="flex gap-3 text-sm text-cream-200">
+            {pathA.map((item) => (
+              <li key={item} className="flex gap-2.5 text-[13px] text-cream-200">
                 <span className="text-gold-400 mt-1 flex-shrink-0">&#9670;</span>
                 <span className="leading-relaxed">{item}</span>
               </li>
@@ -637,30 +648,61 @@ function PhaseSplit() {
           </div>
         </div>
 
-        {/* Phase 2: subtler, OPTIONAL UPGRADE */}
-        <div className="card p-8 flex flex-col">
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-3">
-              <div className="font-serif text-4xl text-cream-300 tabular leading-none">02</div>
-              <div>
-                <div className="text-[11px] uppercase tracking-widest text-cream-400 font-semibold">Phase 2</div>
-                <div className="font-serif text-xl text-cream-50 leading-tight">Vault + Ondo onboarding</div>
+        {/* Path B: subtler, FUTURE */}
+        <div className="card p-7 flex flex-col">
+          <div className="flex items-start justify-between mb-5 gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="font-serif text-4xl text-cream-300 tabular leading-none flex-shrink-0">B</div>
+              <div className="min-w-0">
+                <div className="text-[11px] uppercase tracking-widest text-cream-400 font-semibold">Path B</div>
+                <div className="font-serif text-lg text-cream-50 leading-tight">
+                  Across formally integrates Bebop
+                </div>
               </div>
             </div>
-            <span className="px-2 py-0.5 rounded-full border border-white/15 text-cream-400 text-[10px] tracking-wider">
-              OPTIONAL UPGRADE
+            <span className="px-2 py-0.5 rounded-full border border-white/15 text-cream-400 text-[10px] tracking-wider flex-shrink-0">
+              FUTURE
             </span>
           </div>
           <ul className="space-y-3 flex-1">
-            {phase2.map((item) => (
-              <li key={item} className="flex gap-3 text-sm text-cream-200">
+            {pathB.map((item) => (
+              <li key={item} className="flex gap-2.5 text-[13px] text-cream-200">
                 <span className="text-cream-500 mt-1 flex-shrink-0">&#9670;</span>
                 <span className="leading-relaxed">{item}</span>
               </li>
             ))}
           </ul>
           <div className="mt-6 pt-6 border-t border-white/[0.06] text-xs text-cream-400 leading-relaxed">
-            Decide based on Phase 1 traction and the volume profile Cash actually sees.
+            Subject to internal Across product and legal review.
+          </div>
+        </div>
+
+        {/* Path C: Phase 2 long-term ticker expansion */}
+        <div className="card p-7 flex flex-col">
+          <div className="flex items-start justify-between mb-5 gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="font-serif text-4xl text-cream-300 tabular leading-none flex-shrink-0">C</div>
+              <div className="min-w-0">
+                <div className="text-[11px] uppercase tracking-widest text-cream-400 font-semibold">Path C</div>
+                <div className="font-serif text-lg text-cream-50 leading-tight">
+                  Vault + Ondo onboarding for full coverage
+                </div>
+              </div>
+            </div>
+            <span className="px-2 py-0.5 rounded-full border border-white/15 text-cream-400 text-[10px] tracking-wider flex-shrink-0">
+              PHASE 2
+            </span>
+          </div>
+          <ul className="space-y-3 flex-1">
+            {pathC.map((item) => (
+              <li key={item} className="flex gap-2.5 text-[13px] text-cream-200">
+                <span className="text-cream-500 mt-1 flex-shrink-0">&#9670;</span>
+                <span className="leading-relaxed">{item}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="mt-6 pt-6 border-t border-white/[0.06] text-xs text-cream-400 leading-relaxed">
+            Decide based on Path A traction and the volume profile Cash actually sees.
           </div>
         </div>
       </div>
