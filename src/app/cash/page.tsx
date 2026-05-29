@@ -61,9 +61,10 @@ type Phase =
 
 type Mode = 'buy' | 'sell';
 
-// Mock Ethereum vault holdings shown in Sell mode for permissioned RWA stocks
-// (which can't be queried from chain since they're allowlist-gated). Live assets
-// (USDY, sUSDe, sDAI, weETH, wstETH, USDS, USDC) read real balances via wagmi.
+// Mock Ondo GM holdings shown in Sell mode for permissioned RWA stocks (these
+// addresses don't sit on most wallets in this PoC since the demo wallet doesn't
+// hold them). Live assets (USDY, sUSDe, sDAI, weETH, wstETH, USDS, USDC) read
+// real balances via wagmi.
 const STOCK_MOCK_BALANCES: Record<string, number> = {
   TSLAon: 0.8,
   AAPLon: 1.2,
@@ -555,7 +556,7 @@ export default function CashDemo() {
               <div className="min-w-0">
                 <div className="font-serif text-lg text-cream-50 mb-0.5">Spend with Cash</div>
                 <p className="text-xs text-cream-400">
-                  Use your vault assets with your Cash credit card.
+                  Use your Ethereum-side assets with your Cash credit card.
                 </p>
               </div>
               <button className="flex-shrink-0 flex items-center gap-2 px-3.5 py-2 rounded-full border border-white/10 text-xs text-cream-200 hover:bg-bg-700 transition-colors">
@@ -578,7 +579,7 @@ export default function CashDemo() {
                 <p className="text-xs text-cream-400 mt-1">
                   {mode === 'buy'
                     ? 'Spend USDC from your Cash safe on any Ethereum asset. One signature, ~2s settlement.'
-                    : 'Sell an Ethereum vault position back into USDC on your Cash safe. Same flow, reversed.'}
+                    : 'Sell an Ethereum-side position back into USDC on your Cash safe. Same flow, reversed.'}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -611,7 +612,7 @@ export default function CashDemo() {
               {/* FROM card */}
               <div className="card-inner p-5">
                 <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-3">
-                  {mode === 'buy' ? 'From · Cash safe on Optimism' : 'From · Ethereum vault'}
+                  {mode === 'buy' ? 'From · Cash safe on Optimism' : 'From · Your Ethereum address'}
                 </div>
                 <div className="flex items-center gap-3 mb-4">
                   <input
@@ -661,7 +662,7 @@ export default function CashDemo() {
                   ) : (
                     <>
                       <span>
-                        {isStockSelected ? 'Vault balance' : 'Wallet balance'}:{' '}
+                        {isStockSelected ? 'Holdings' : 'Wallet balance'}:{' '}
                         <span className="text-cream-200 tabular">
                           {!isConnected
                             ? 'Connect wallet'
@@ -690,7 +691,7 @@ export default function CashDemo() {
               {/* TO card */}
               <div className="card-inner p-5">
                 <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-3">
-                  {mode === 'buy' ? 'To · Ethereum vault' : 'To · Cash safe on Optimism'}
+                  {mode === 'buy' ? 'To · Your Ethereum address' : 'To · Cash safe on Optimism'}
                 </div>
                 <div className="flex items-center gap-3 mb-4">
                   <input
@@ -759,7 +760,7 @@ export default function CashDemo() {
                 setAmount={setAmount}
                 opChainLogo={opChainLogo}
                 ethChainLogo={ethChainLogo}
-                onSwitchToUsdy={() => setSelectedSymbol('USDY')}
+                onSwitchToUsdy={() => setSelectedSymbol('TSLAon')}
               />
             ) : (
               <>
@@ -854,7 +855,7 @@ export default function CashDemo() {
                   </div>
                 </div>
                 <div className="text-[10px] text-cream-500 leading-snug text-right max-w-[55%]">
-                  In production this would be the ether.fi {mode === 'buy' ? 'Ethereum vault' : 'Cash safe'} contract.
+                  In production this could be the Cash safe contract on {mode === 'buy' ? 'Ethereum' : 'Optimism'}, or the user&rsquo;s wallet directly. ether.fi&rsquo;s call.
                 </div>
               </div>
             )}
@@ -907,8 +908,8 @@ export default function CashDemo() {
               {mode === 'sell' && phase !== 'filled' && (
                 <p className="mt-3 text-[11px] text-cream-500 leading-relaxed">
                   Sell mode shows a real, live Across quote in the return direction. Execution
-                  requires actual Ethereum-side balance; in production this would fire from
-                  ether.fi's Ethereum vault contract.
+                  requires actual Ethereum-side balance; in production this would fire from the
+                  user&rsquo;s Ethereum address or the Cash safe contract.
                 </p>
               )}
               {error && phase === 'error' && (
@@ -1136,11 +1137,11 @@ function DemoBanner() {
       <div className="text-sm leading-relaxed">
         <span className="font-semibold gold-text">Live PoC.</span>{' '}
         <span className="text-cream-200">
-          Opens with TSLAon selected (Ondo's tokenized Tesla) showing the architecture preview.
-          Ondo GM stocks are permissioned; live execution requires ether.fi's KYC'd Ethereum
-          vault. Switch to USDY (or any yield asset below it) for an end-to-end live quote and
-          execution against the production Across integrator ID. Buy and Sell directions both
-          supported.
+          Opens with TSLAon selected (Ondo&rsquo;s tokenized Tesla). For TSLAon, NVDAon, GOOGLon,
+          COINon, HOODon, MSTRon, CRCLon the Buy button executes end-to-end on mainnet through
+          Across + Bebop RFQ atomically (~2s, zero slippage on the RFQ leg). AAPLon, SPYon, QQQon
+          render the architecture preview only (awaiting Bebop coverage). USDY and the live yield
+          assets below use the vanilla Across Swap API path. Buy and Sell both supported.
         </span>
       </div>
     </div>
@@ -1380,7 +1381,7 @@ function FilledState({
         </div>
         <div className="font-serif text-lg gold-text">
           {isBuy
-            ? `${asset} deposited into your Ethereum vault.`
+            ? `${asset} delivered to your Ethereum address.`
             : `${asset} sold. USDC credited to your Cash safe.`}
         </div>
       </div>
@@ -1423,21 +1424,21 @@ function FlowExplainer({ asset, mode }: { asset: string; mode: Mode }) {
     {
       i: '3',
       t: 'Embedded action',
-      d: `MulticallHandler swaps USDC into ${asset || 'the target asset'} atomically on Ethereum.`,
+      d: `MulticallHandler approves and routes through Bebop RFQ into ${asset || 'the target asset'} atomically on Ethereum.`,
     },
     {
       i: '✓',
-      t: 'Vault deposit',
-      d: `${asset || 'The asset'} lands in the ether.fi Ethereum vault. Same transaction.`,
+      t: 'Delivered',
+      d: `${asset || 'The asset'} lands at the recipient address (user wallet or Cash safe). Same transaction.`,
     },
   ];
   const sellSteps = [
     {
       i: '1',
-      t: 'Vault sells',
-      d: `User triggers liquidation; ether.fi Ethereum vault unwinds the ${asset || 'asset'} position.`,
+      t: 'User sells',
+      d: `${asset || 'Asset'} is sent into the Across Swap API on Ethereum; user signs once.`,
     },
-    { i: '2', t: 'Across routes', d: 'Vault calls the Swap API with reversed params; relayer fronts USDC on OP.' },
+    { i: '2', t: 'Across routes', d: 'Swap API quotes the reverse direction; relayer fronts USDC on Optimism.' },
     { i: '3', t: 'Relayer fills', d: 'Across settles on Optimism in ~2 seconds. Same canonical USDC, no wrapped assets.' },
     { i: '✓', t: 'Safe credit', d: 'USDC lands in the Cash safe on OP. Spendable on the card immediately.' },
   ];
@@ -1470,9 +1471,10 @@ function FlowExplainer({ asset, mode }: { asset: string; mode: Mode }) {
 }
 
 // ============ STOCK ARCHITECTURE PREVIEW ============
-// Shown when a permissioned RWA stock (Ondo GM) is selected. Live execution requires
-// ether.fi's KYC'd Ethereum vault onboarded as an Ondo GM holder. The architecture is
-// identical to USDY (live below), so the live USDY route serves as proof.
+// Shown for Ondo GM stocks that don't yet have Bebop secondary-market buy-side
+// coverage (AAPLon, SPYon, QQQon), and for Sell mode on any stock. The architecture
+// is identical to the 7 Bebop-buyable Ondo GM tickers (TSLAon, NVDAon, GOOGLon,
+// COINon, HOODon, MSTRon, CRCLon), which execute end-to-end today.
 
 function StockArchitecturePreview({
   symbol,
@@ -1503,14 +1505,14 @@ function StockArchitecturePreview({
 
   const buySteps = [
     { n: '01', title: 'Cash safe debits USDC', sub: `${usdAmount.toLocaleString()} USDC leaves the Optimism Cash safe via Across SpokePool. One user signature.` },
-    { n: '02', title: 'Across settles on Ethereum', sub: 'Relayer fronts USDC on Ethereum in ~2 seconds. Canonical transfer, UMA-secured.' },
-    { n: '03', title: "ether.fi KYC'd vault receives", sub: "USDC lands in ether.fi's Ethereum vault, onboarded with Ondo as an approved holder." },
-    { n: '04', title: `Vault buys ${symbol}`, sub: `Embedded action calls Ondo GM's purchase contract from the vault. ${shares.toFixed(4)} ${symbol} (\u2248$${usdValue.toFixed(2)}) minted to the vault. Atomic.` },
-    { n: '\u2713', title: `${symbol} held, abstracted in Cash`, sub: `User sees ${shares.toFixed(4)} ${underlying || symbol} in their Cash UI. Spendable via card on conversion back to USDC.` },
+    { n: '02', title: 'Across settles on Ethereum', sub: 'Relayer fronts USDC to the MulticallHandler in ~2 seconds. Canonical transfer, UMA-secured.' },
+    { n: '03', title: 'MulticallHandler routes', sub: 'Approves the destination liquidity source and executes the swap atomically inside the same fill. No funds are ever held by Across.' },
+    { n: '04', title: `${symbol} delivered`, sub: `${shares.toFixed(4)} ${symbol} (\u2248$${usdValue.toFixed(2)}) lands at the recipient on Ethereum (user wallet or Cash safe). Atomic with the deposit.` },
+    { n: '\u2713', title: `${underlying || symbol} held, abstracted in Cash`, sub: `User sees ${shares.toFixed(4)} ${underlying || symbol} in Cash. Spendable via card on conversion back to USDC.` },
   ];
   const sellSteps = [
-    { n: '01', title: `Vault redeems ${symbol}`, sub: `${shares.toFixed(4)} ${symbol} (\u2248$${usdValue.toFixed(2)}) burned at Ondo GM. USDC returns to the vault on Ethereum.` },
-    { n: '02', title: 'Across deposit, return leg', sub: 'Vault deposits USDC into Across SpokePool on Ethereum.' },
+    { n: '01', title: `User sells ${symbol}`, sub: `${shares.toFixed(4)} ${symbol} (\u2248$${usdValue.toFixed(2)}) routed back to USDC on Ethereum.` },
+    { n: '02', title: 'Across deposit, return leg', sub: 'USDC deposited into Across SpokePool on Ethereum.' },
     { n: '03', title: 'Relayer fills on Optimism', sub: 'USDC lands in the Cash safe on Optimism in ~2 seconds.' },
     { n: '\u2713', title: 'Spendable on card', sub: `${usdValue.toFixed(2)} USDC now in the OP Cash safe, immediately spendable.` },
   ];
@@ -1536,12 +1538,12 @@ function StockArchitecturePreview({
         </h3>
         <p className="text-xs text-cream-400 leading-relaxed mb-5 max-w-2xl">
           {isBuy
-            ? `${underlying || symbol} lives on Ethereum and requires KYC. ether.fi's Ethereum vault is onboarded with Ondo GM as an approved holder. The user sees ${underlying || symbol} in their Cash UI; the vault holds the position on their behalf. Architecture below; live execution requires the vault deployed and onboarded.`
-            : `${underlying || symbol} is redeemed back to USDC at Ondo GM, then returns to the Cash safe via Across. Same architecture as the buy direction, in reverse.`}
+            ? `${symbol} is awaiting Bebop secondary-market coverage. The architecture below is identical to the seven already-live Ondo GM tickers (TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, CRCLon), which execute end-to-end today via Across + Bebop RFQ atomically.`
+            : `${symbol} is redeemed back to USDC on Ethereum and returns to the Cash safe via Across. Same architecture as the Buy direction, in reverse.`}
         </p>
 
         {/* Step strip */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-2.5">
+        <div className={`grid grid-cols-1 ${isBuy ? 'md:grid-cols-5' : 'md:grid-cols-4'} gap-2.5`}>
           {steps.map((s, i) => (
             <div key={i} className="rounded-xl bg-bg-700 border border-white/[0.06] p-3">
               <div className="flex items-center gap-2 mb-1.5">
@@ -1557,29 +1559,31 @@ function StockArchitecturePreview({
           ))}
         </div>
 
-        {/* CTA: switch to USDY for live proof */}
-        <div className="mt-5 rounded-xl bg-bg-700/60 border border-white/[0.06] p-4 flex items-start gap-3">
-          <div className="text-gold-400 mt-0.5">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 8v4M12 16h.01" />
-            </svg>
-          </div>
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-semibold text-cream-100 mb-1">
-              Live proof: identical architecture, no KYC gate
+        {/* CTA: switch to a Bebop-buyable Ondo GM stock for live execution */}
+        {isBuy && (
+          <div className="mt-5 rounded-xl bg-bg-700/60 border border-white/[0.06] p-4 flex items-start gap-3">
+            <div className="text-gold-400 mt-0.5">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" />
+                <path d="M12 8v4M12 16h.01" />
+              </svg>
             </div>
-            <div className="text-[11px] text-cream-400 leading-relaxed mb-3">
-              USDY (Ondo's yield USD) uses the same Swap API + MulticallHandler pattern. Switch to USDY to fetch a real Across quote and execute end-to-end against the production integrator ID.
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-semibold text-cream-100 mb-1">
+                Live execution: pick a Bebop-buyable Ondo GM ticker
+              </div>
+              <div className="text-[11px] text-cream-400 leading-relaxed mb-3">
+                TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, and CRCLon execute end-to-end on mainnet right now via Across + Bebop RFQ. Same architecture as above, atomic, ~2 seconds, zero slippage on the RFQ leg.
+              </div>
+              <button
+                onClick={onSwitchToUsdy}
+                className="text-[11px] px-3 py-1.5 rounded-lg bg-gold-500 text-[#1A140A] font-semibold hover:bg-gold-400 transition"
+              >
+                Run live demo with TSLAon &rarr;
+              </button>
             </div>
-            <button
-              onClick={onSwitchToUsdy}
-              className="text-[11px] px-3 py-1.5 rounded-lg bg-gold-500 text-[#1A140A] font-semibold hover:bg-gold-400 transition"
-            >
-              Run live demo with USDY &rarr;
-            </button>
           </div>
-        </div>
+        )}
       </div>
     </>
   );
