@@ -4,9 +4,9 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { useAccount, useBalance, useChainId, useSendTransaction, useSwitchChain } from 'wagmi';
+import { useAccount, useBalance, useChainId, useReadContract, useSendTransaction, useSwitchChain } from 'wagmi';
 import type { AcrossChain, AcrossToken } from '@/lib/tokens';
-import { DEMO_DEST_SYMBOLS, isStock, LOCAL_LOGO_OVERRIDES, ORIGIN_USDC, RELIABLE_LOGOS, STOCK_MOCK_PRICE } from '@/lib/tokens';
+import { DEMO_DEST_SYMBOLS, isBebopBuyable, isStock, LOCAL_LOGO_OVERRIDES, ORIGIN_USDC, RELIABLE_LOGOS, STOCK_MOCK_PRICE } from '@/lib/tokens';
 import { formatUnits, friendlyError, parseUnits } from '@/lib/format';
 
 type Quote = {
@@ -21,6 +21,31 @@ type Quote = {
   checks?: {
     allowance?: { actual?: string; expected?: string };
     balance?: { actual?: string; expected?: string };
+  };
+};
+
+// Response shape from /api/build-deposit (Across + Bebop RFQ + MulticallHandler path).
+// Used for Bebop-buyable Ondo GM stocks; the existing Quote type is used for the
+// vanilla Across Swap API path.
+type StockQuote = {
+  spokePool: string;
+  transaction: { to: string; data: string; value: string; chainId: number };
+  bridge: { inputAmount: string; expectedOutputAmount: string; acrossFeeBps: number };
+  bebop: {
+    outputAmount: string;
+    outputAmountDecimal: number;
+    outputSymbol: string;
+    outputDecimals: number;
+    pricePerShare: number;
+    settlementAddress: string;
+    expiry: number;
+  } | null;
+  deposit: {
+    depositor: string;
+    recipient: string;
+    multicallHandler: string;
+    quoteTimestamp: number;
+    fillDeadline: number;
   };
 };
 
@@ -77,6 +102,7 @@ export default function CashDemo() {
   const [amount, setAmount] = useState('');
   const [selectedSymbol, setSelectedSymbol] = useState('TSLAon');
   const [quote, setQuote] = useState<Quote | null>(null);
+  const [stockQuote, setStockQuote] = useState<StockQuote | null>(null);
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<string | null>(null);
   const [originTxHash, setOriginTxHash] = useState<string | null>(null);
@@ -104,9 +130,9 @@ export default function CashDemo() {
   }, []);
 
   // Build destination asset options: combine curated metadata with live API token data.
-  // Ondo GM stocks are NOT in Across's whitelist (KYC-gated, permissioned), so we
-  // synthesize a placeholder token for them - they will be shown in the picker but
-  // will render an architecture preview instead of a live quote.
+  // Ondo GM stocks are NOT in Across's whitelist (KYC-gated, permissioned), so for the
+  // Bebop-buyable ones we use the on-chain Ondo GM token address (drives the destination
+  // RFQ swap); for the preview-only ones (no Bebop coverage yet) we keep a placeholder.
   const destOptions = useMemo(() => {
     return DEMO_DEST_SYMBOLS.map((curated) => {
       const match = destTokens.find(
@@ -117,7 +143,7 @@ export default function CashDemo() {
           ...curated,
           token: match || {
             chainId: 1,
-            address: '0x0000000000000000000000000000000000000000',
+            address: curated.tokenAddress || '0x0000000000000000000000000000000000000000',
             name: `${curated.underlying || curated.symbol} (Ondo GM)`,
             symbol: curated.symbol,
             decimals: 18,
@@ -135,6 +161,14 @@ export default function CashDemo() {
 
   const isStockSelected = useMemo(
     () => isStock(selectedAsset?.symbol || ''),
+    [selectedAsset],
+  );
+
+  // True if the selected asset is a Bebop-buyable Ondo GM stock (TSLAon, NVDAon, etc.)
+  // -> use the /api/build-deposit path (Across + Bebop RFQ + MulticallHandler).
+  // False for preview-only stocks (AAPLon, SPYon, QQQon) or non-stock assets.
+  const isBebopSelected = useMemo(
+    () => isBebopBuyable(selectedAsset?.symbol || ''),
     [selectedAsset],
   );
 
@@ -179,20 +213,74 @@ export default function CashDemo() {
   // Reset transient state when toggling mode
   useEffect(() => {
     setQuote(null);
+    setStockQuote(null);
     setPhase('idle');
     setError(null);
     setOriginTxHash(null);
     setFillTxHash(null);
   }, [mode]);
 
-  // Fetch quote on input change. Direction depends on mode.
-  // Skip for permissioned RWA stocks (Ondo GM) - they show architecture preview instead.
+  // Fetch quote on input change. Three branches:
+  //   1. Bebop-buyable Ondo GM stock in Buy mode -> POST /api/build-deposit
+  //      (Across + Bebop RFQ + MulticallHandler atomic path).
+  //   2. Preview-only stock (AAPLon, SPYon, QQQon) -> show architecture preview,
+  //      no live quote.
+  //   3. Live asset (USDY, sUSDe, etc.) -> GET /api/swap (Across Swap API).
   useEffect(() => {
+    // Branch 1: Bebop path for buyable stocks (Buy direction only; Sell uses Swap API).
+    if (isStockSelected && isBebopSelected && mode === 'buy') {
+      setQuote(null);
+      if (!address || !amount || Number(amount) <= 0 || !selectedAsset?.token) {
+        setStockQuote(null);
+        setPhase('idle');
+        return;
+      }
+      const ctrl = new AbortController();
+      const t = setTimeout(async () => {
+        setPhase('quoting');
+        setError(null);
+        try {
+          const raw = parseUnits(amount, ORIGIN_USDC.decimals);
+          const r = await fetch('/api/build-deposit', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              depositor: address,
+              recipient: address,
+              inputAmount: raw.toString(),
+              outputToken: selectedAsset.token!.address,
+            }),
+            signal: ctrl.signal,
+          });
+          if (!r.ok) {
+            const j = await r.json().catch(() => ({}));
+            throw new Error(j.error || `build-deposit failed (${r.status})`);
+          }
+          setStockQuote(await r.json());
+          setPhase('quoted');
+        } catch (e: any) {
+          if (e?.name === 'AbortError') return;
+          setError(friendlyError(String(e?.message || e)));
+          setPhase('error');
+          setStockQuote(null);
+        }
+      }, 400);
+      return () => {
+        clearTimeout(t);
+        ctrl.abort();
+      };
+    }
+
+    // Branch 2: Preview-only stocks (no live quote).
     if (isStockSelected) {
       setQuote(null);
+      setStockQuote(null);
       setPhase('idle');
       return;
     }
+
+    // Branch 3: Live non-stock asset via Across Swap API.
+    setStockQuote(null);
     if (!address || !amount || Number(amount) <= 0 || !selectedAsset?.token) {
       setQuote(null);
       setPhase('idle');
@@ -203,9 +291,6 @@ export default function CashDemo() {
       setPhase('quoting');
       setError(null);
       try {
-        // Build params per direction.
-        // Buy: input USDC OP (6 decimals), output asset on ETH
-        // Sell: input asset on ETH, output USDC OP
         const isBuy = mode === 'buy';
         const inputToken = isBuy ? ORIGIN_USDC.address : selectedAsset.token!.address;
         const outputToken = isBuy ? selectedAsset.token!.address : ORIGIN_USDC.address;
@@ -240,7 +325,7 @@ export default function CashDemo() {
       clearTimeout(t);
       ctrl.abort();
     };
-  }, [address, amount, selectedAsset, mode, isStockSelected]);
+  }, [address, amount, selectedAsset, mode, isStockSelected, isBebopSelected]);
 
   const feePct = useMemo(() => {
     const raw = quote?.fees?.total?.pct;
@@ -263,9 +348,109 @@ export default function CashDemo() {
     }
   }, [quote]);
 
+  // For the Bebop path the spender is SpokePool on Optimism, not Across's swap router.
+  // Read USDC OP allowance to that SpokePool so we only ask the user to approve when
+  // their current allowance is insufficient.
+  const { data: spokeAllowance } = useReadContract({
+    address: ORIGIN_USDC.address as `0x${string}`,
+    abi: [
+      {
+        type: 'function',
+        name: 'allowance',
+        stateMutability: 'view',
+        inputs: [
+          { name: 'owner', type: 'address' },
+          { name: 'spender', type: 'address' },
+        ],
+        outputs: [{ type: 'uint256' }],
+      },
+    ] as const,
+    functionName: 'allowance',
+    args: address && stockQuote?.spokePool
+      ? [address as `0x${string}`, stockQuote.spokePool as `0x${string}`]
+      : undefined,
+    chainId: 10,
+    query: {
+      enabled: !!address && !!stockQuote?.spokePool,
+      refetchInterval: 6000,
+    },
+  });
+
+  const needsStockApproval = useMemo(() => {
+    if (!stockQuote) return false;
+    if (spokeAllowance === undefined) return true; // not yet read -> assume needed
+    try {
+      return (spokeAllowance as bigint) < BigInt(stockQuote.bridge.inputAmount);
+    } catch {
+      return true;
+    }
+  }, [stockQuote, spokeAllowance]);
+
   async function execute() {
-    if (!quote || !address || !selectedAsset?.token) return;
+    if (!address || !selectedAsset?.token) return;
     setError(null);
+
+    // ==============================================================
+    // BRANCH A: Bebop path (Buy of an Ondo GM stock with Bebop coverage).
+    // ==============================================================
+    if (stockQuote) {
+      try {
+        const originChain = ORIGIN_USDC.chainId; // Optimism
+        if (chainId !== originChain) {
+          await switchChain({ chainId: originChain });
+        }
+        // USDC.approve(SpokePool, max) only if current allowance < required inputAmount.
+        if (needsStockApproval) {
+          const spender = stockQuote.spokePool.replace(/^0x/, '').padStart(64, '0');
+          const amt = (1n << 256n) - 1n;
+          const amtHex = amt.toString(16).padStart(64, '0');
+          const data = `0x095ea7b3${spender}${amtHex}` as `0x${string}`;
+          setPhase('approving');
+          await sendTransactionAsync({
+            to: ORIGIN_USDC.address as `0x${string}`,
+            data,
+          });
+        }
+        setPhase('signing');
+        const txHash = await sendTransactionAsync({
+          to: stockQuote.transaction.to as `0x${string}`,
+          data: stockQuote.transaction.data as `0x${string}`,
+          value: BigInt(stockQuote.transaction.value || '0'),
+        });
+        setOriginTxHash(txHash);
+        setPhase('filling');
+
+        const start = Date.now();
+        const poll = async () => {
+          try {
+            const r = await fetch(
+              `/api/status?originChainId=${originChain}&depositTxHash=${txHash}`,
+              { cache: 'no-store' },
+            );
+            if (r.ok) {
+              const j = await r.json();
+              if (j?.status === 'filled' || j?.fillTx) {
+                setFillTxHash(j.fillTx || j.fillTxHash || null);
+                setPhase('filled');
+                return;
+              }
+            }
+          } catch {}
+          if (Date.now() - start < 120_000) setTimeout(poll, 2000);
+        };
+        setTimeout(poll, 1500);
+        return;
+      } catch (e: any) {
+        setError(friendlyError(String(e?.shortMessage || e?.message || e)));
+        setPhase('error');
+        return;
+      }
+    }
+
+    // ==============================================================
+    // BRANCH B: Standard Across Swap API path (live assets + Sell of any asset).
+    // ==============================================================
+    if (!quote) return;
     try {
       const isBuy = mode === 'buy';
       const originChain = isBuy ? ORIGIN_USDC.chainId : selectedAsset.token.chainId;
@@ -511,7 +696,11 @@ export default function CashDemo() {
                   <input
                     readOnly
                     value={(() => {
-                      // Stocks: compute from mock price (no live quote)
+                      // Bebop-buyable stock (Buy mode): show live Bebop RFQ output amount.
+                      if (isStockSelected && isBebopSelected && mode === 'buy' && stockQuote?.bebop) {
+                        return stockQuote.bebop.outputAmountDecimal.toFixed(6);
+                      }
+                      // Preview-only stocks: compute from mock price (no live route).
                       if (isStockSelected && selectedAsset?.symbol) {
                         const n = Number(amount);
                         if (!n || n <= 0) return '';
@@ -522,7 +711,7 @@ export default function CashDemo() {
                           ? (n / price).toFixed(6)
                           : (n * price).toFixed(2);
                       }
-                      // Live assets: use quote
+                      // Live (non-stock) assets: use Across Swap API quote.
                       return quote
                         ? formatUnits(quote.expectedOutputAmount, quote.outputToken.decimals, 6)
                         : '';
@@ -556,7 +745,11 @@ export default function CashDemo() {
               </div>
             </div>
 
-            {isStockSelected ? (
+            {/* Architecture-preview-only path: preview-only stocks (AAPLon, SPYon, QQQon)
+                without Bebop secondary-market coverage, and Sell mode for any stock
+                (Sell flow not yet wired). Bebop-buyable stocks in Buy mode fall through
+                to the executable live-quote form below. */}
+            {isStockSelected && (!isBebopSelected || mode === 'sell') ? (
               <StockArchitecturePreview
                 symbol={selectedAsset?.symbol || ''}
                 underlying={selectedAsset?.underlying}
@@ -613,18 +806,45 @@ export default function CashDemo() {
                   <span className="px-2 py-0.5 rounded-full bg-gold-500 text-[#1A140A] font-semibold text-[10px] tracking-wider">
                     SPONSORED · FREE
                   </span>
+                ) : stockQuote ? (
+                  <span className="text-cream-200 tabular">
+                    {formatFeeUsd(usdAmount, stockQuote.bridge.acrossFeeBps / 100)}
+                  </span>
                 ) : (
                   <span className="text-cream-200 tabular">{formatFeeUsd(usdAmount, feePct ?? 0)}</span>
                 )}
               </QuoteRow>
             </div>
 
+            {/* Bebop RFQ preview row - only when on the Bebop path, shows the live
+                executable price per share and the makers behind the order. */}
+            {stockQuote?.bebop && (
+              <div className="mt-3 rounded-xl border border-white/[0.05] bg-bg-700/40 px-3.5 py-2.5 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-0.5">
+                    Destination route
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs tabular text-cream-200">
+                      Bebop RFQ on Ethereum
+                    </span>
+                    <span className="text-[10px] text-cream-500">
+                      ({stockQuote.bebop.outputAmountDecimal.toFixed(6)} {selectedAsset?.symbol} @ ${stockQuote.bebop.pricePerShare.toFixed(2)}/share)
+                    </span>
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-gold-500/20 border border-gold-500/30 text-gold-300 font-semibold text-[10px] tracking-wider">
+                  ZERO SLIPPAGE
+                </span>
+              </div>
+            )}
+
             {/* Recipient disclosure - honest about where funds land in this PoC */}
             {isConnected && address && (
               <div className="mt-3 rounded-xl border border-white/[0.05] bg-bg-700/40 px-3.5 py-2.5 flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-0.5">
-                    {mode === 'buy' ? 'USDY recipient' : 'USDC recipient'}
+                    {mode === 'buy' ? `${selectedAsset?.symbol || 'Token'} recipient` : 'USDC recipient'}
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs tabular text-cream-200">
@@ -660,7 +880,7 @@ export default function CashDemo() {
                 <button
                   onClick={execute}
                   disabled={
-                    !quote ||
+                    (!quote && !stockQuote) ||
                     phase === 'quoting' ||
                     phase === 'signing' ||
                     phase === 'filling' ||
@@ -676,7 +896,7 @@ export default function CashDemo() {
                     (mode === 'buy' ? 'Filling on Ethereum...' : 'Filling on Optimism...')}
                   {(phase === 'idle' || phase === 'quoted' || phase === 'error') &&
                     (mode === 'buy'
-                      ? needsApproval
+                      ? (stockQuote ? needsStockApproval : needsApproval)
                         ? `Approve & buy ${selectedAsset?.symbol || ''}`
                         : `Buy ${selectedAsset?.symbol || ''}`
                       : needsApproval
