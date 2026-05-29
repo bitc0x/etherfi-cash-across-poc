@@ -640,9 +640,14 @@ function PathRoadmap() {
             ))}
           </ul>
           <div className="mt-6 pt-6 border-t border-gold-500/15">
-            <Link href="/cash" className="text-xs gold-text hover:underline font-semibold">
-              Run the live demo &rarr;
-            </Link>
+            <a
+              href="https://github.com/bitc0x/etherfi-cash-across-poc/blob/main/PATH_A_REFERENCE.md"
+              target="_blank"
+              rel="noreferrer"
+              className="text-xs gold-text hover:underline font-semibold"
+            >
+              Read the integration reference &rarr;
+            </a>
           </div>
         </div>
 
