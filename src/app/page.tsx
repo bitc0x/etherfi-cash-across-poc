@@ -22,6 +22,7 @@ export default async function LandingPage() {
       <Nav />
       <Hero />
       <StatStrip />
+      <LiveReceipt />
       <Unlock />
       <OndoStocks />
       <EmbeddedActions />
@@ -116,6 +117,87 @@ function StatStrip() {
             <div className="text-sm text-cream-400 mt-3 serif text-base">{s.label}</div>
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+// Live receipt: real mainnet tx hashes proving the Phase 1 architecture works
+// end-to-end. The single most compelling artifact in the deck.
+function LiveReceipt() {
+  const originTx = '0x189186f9e1bafeddd2e7cdce36e2218c8d9637d478cf3eb4ac8d6baff94d0df9';
+  const fillTx = '0xc4879dd063bf7f6ec93eb62f1f74f572cffa7152a0a10deab8abf514ae50e5d0';
+  return (
+    <section className="max-w-6xl mx-auto px-6 pb-24">
+      <div className="card-strong p-8 md:p-10 border-gold-500/30 bg-gradient-to-br from-gold-500/[0.04] to-transparent">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="w-2 h-2 rounded-full bg-gold-400 animate-pulse" />
+          <div className="text-[11px] uppercase tracking-widest gold-text font-semibold">
+            Proof of execution
+          </div>
+        </div>
+        <h2 className="font-serif text-3xl md:text-4xl gold-text mb-4 tracking-tightest leading-[1.05]">
+          Already executing on mainnet.
+        </h2>
+        <p className="text-cream-300 max-w-3xl mb-7 leading-relaxed">
+          Phase 1 isn&rsquo;t a pitch. The Across + Bebop RFQ + MulticallHandler path was
+          executed end-to-end on Ethereum mainnet from a Cash-style USDC-on-Optimism flow.
+          USDC routed atomically into TSLAon, delivered directly to the recipient on Ethereum.
+          One signature, ~2 seconds, zero slippage on the RFQ leg.
+        </p>
+
+        {/* Receipt summary: input -> output flow */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+          <div className="rounded-xl bg-bg-700 border border-white/[0.06] p-4">
+            <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-1.5">Sent</div>
+            <div className="text-xl tabular text-cream-50 font-semibold">1.312601 USDC</div>
+            <div className="text-[11px] text-cream-400 mt-0.5">on Optimism, from Cash safe</div>
+          </div>
+          <div className="rounded-xl bg-bg-700 border border-white/[0.06] p-4">
+            <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-1.5">Received</div>
+            <div className="text-xl tabular text-cream-50 font-semibold">0.002685 TSLAon</div>
+            <div className="text-[11px] text-cream-400 mt-0.5">on Ethereum, atomic, Bebop RFQ</div>
+          </div>
+          <div className="rounded-xl bg-bg-700 border border-white/[0.06] p-4">
+            <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-1.5">Path</div>
+            <div className="text-sm text-cream-100 leading-tight">
+              Across SpokePool &rarr; MulticallHandler &rarr; Bebop RFQ &rarr; recipient
+            </div>
+            <div className="text-[11px] text-cream-400 mt-0.5">all in one transaction</div>
+          </div>
+        </div>
+
+        {/* Tx hash links */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <a
+            href={`https://optimistic.etherscan.io/tx/${originTx}`}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-xl border border-white/[0.06] hover:border-gold-500/30 bg-bg-700/40 p-4 transition-colors block"
+          >
+            <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-1.5">
+              Origin tx &middot; Optimism
+            </div>
+            <div className="text-xs tabular gold-text break-all">
+              {originTx.slice(0, 24)}...{originTx.slice(-8)}
+            </div>
+            <div className="text-[10px] text-cream-500 mt-1">Open in Optimistic Etherscan &rarr;</div>
+          </a>
+          <a
+            href={`https://etherscan.io/tx/${fillTx}`}
+            target="_blank"
+            rel="noreferrer"
+            className="rounded-xl border border-white/[0.06] hover:border-gold-500/30 bg-bg-700/40 p-4 transition-colors block"
+          >
+            <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-1.5">
+              Fill tx &middot; Ethereum
+            </div>
+            <div className="text-xs tabular gold-text break-all">
+              {fillTx.slice(0, 24)}...{fillTx.slice(-8)}
+            </div>
+            <div className="text-[10px] text-cream-500 mt-1">Open in Etherscan &rarr;</div>
+          </a>
+        </div>
       </div>
     </section>
   );
@@ -526,7 +608,7 @@ function PhaseSplit() {
       </p>
 
       <div className="grid md:grid-cols-2 gap-5">
-        {/* Phase 1 — gold-accented, "LIVE TODAY" */}
+        {/* Phase 1: gold-accented, LIVE TODAY */}
         <div className="card p-8 border-gold-500/30 bg-gold-500/[0.03] flex flex-col">
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-3">
@@ -555,7 +637,7 @@ function PhaseSplit() {
           </div>
         </div>
 
-        {/* Phase 2 — subtler, "FUTURE UPGRADE" */}
+        {/* Phase 2: subtler, OPTIONAL UPGRADE */}
         <div className="card p-8 flex flex-col">
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-3">
@@ -888,10 +970,10 @@ function FinalCTA() {
           The PoC is already running.
         </h2>
         <p className="text-cream-300 mb-10 max-w-2xl mx-auto leading-relaxed text-lg">
-          The Cash safe view with the Across Swap API wired in, both directions. Opens on
-          TSLAon showing the Ondo GM architecture, switch to USDY (or any live yield asset) for
-          end-to-end execution against our production integrator ID. Live quotes, live execution,
-          on-chain settlement. Connect a wallet, try it. Then let's talk about the rest.
+          The Cash safe view with Across + Bebop RFQ wired in, both directions. Opens on TSLAon
+          ready to execute end-to-end through our production integrator ID. Live quotes, live
+          execution, on-chain settlement, mainnet tx hashes already on record. Connect a wallet,
+          try it. Then let&rsquo;s talk about the rest.
         </p>
         <Link href="/cash" className="btn-gold inline-block">
           Open the live PoC →
