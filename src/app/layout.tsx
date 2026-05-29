@@ -4,13 +4,21 @@ import { Providers } from './providers';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://etherfi-cash-across-poc.vercel.app'),
-  title: 'ether.fi × Across · Cash, anywhere',
+  title: 'ether.fi × Across · Ondo stocks in Cash, atomic',
   description:
-    'One signature in your Cash safe. Any Ethereum asset. Powered by the Across Swap API.',
+    'USDC on Optimism to TSLAon, NVDAon, GOOGLon and the wider Ondo GM family in one signature. Across + Bebop RFQ. Mainnet-proven.',
   icons: { icon: '/etherfi-logo.png' },
   openGraph: {
-    title: 'ether.fi × Across',
-    description: 'One signature in your Cash safe. Any Ethereum asset.',
+    title: 'ether.fi × Across · Ondo stocks in Cash',
+    description:
+      'One signature, ~2 seconds, zero slippage on the RFQ leg. Mainnet-proven Path A live today.',
+    images: ['/etherfi-logo.png'],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'ether.fi × Across · Ondo stocks in Cash',
+    description:
+      'One signature, ~2 seconds, zero slippage on the RFQ leg. Mainnet-proven Path A live today.',
     images: ['/etherfi-logo.png'],
   },
 };

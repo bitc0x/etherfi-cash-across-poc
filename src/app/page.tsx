@@ -513,7 +513,7 @@ function Architecture() {
     'Recipient choice: Cash safe contract or user wallet',
     'UI abstraction across both safes',
     'Position accounting and yield display',
-    'Optional vault for Phase 2 primary-mint depth',
+    'Optional vault for Path C primary-mint depth',
   ];
   const across = [
     'Cross-chain routing and swap execution',
@@ -554,7 +554,7 @@ function Architecture() {
             ))}
           </ul>
           <div className="mt-6 pt-6 border-t border-white/[0.06] text-xs text-cream-400 leading-relaxed">
-            UI work + a recipient address. Phase 1 ships in days.
+            UI work + a recipient address. Path A ships in days.
           </div>
         </div>
 
@@ -612,8 +612,8 @@ function PathRoadmap() {
       <p className="text-cream-300 max-w-3xl mb-12 leading-relaxed text-lg">
         Path A is live today and requires zero Across-side work. Path B is a future improvement
         to Across&rsquo;s Swap API. Path C is the long-term ticker expansion. The three are
-        independent: A doesn&rsquo;t block B, B doesn&rsquo;t block C, and Phase 1 ships either
-        way.
+        independent: A doesn&rsquo;t block B, B doesn&rsquo;t block C, and Path A ships
+        regardless.
       </p>
 
       <div className="grid md:grid-cols-3 gap-5">
@@ -1009,17 +1009,28 @@ function FinalCTA() {
     <section className="max-w-6xl mx-auto px-6 py-24">
       <div className="card-strong p-12 md:p-16 text-center">
         <h2 className="font-serif text-4xl md:text-5xl gold-text mb-6 tracking-tightest">
-          The PoC is already running.
+          The PoC is already running. The integration is already mapped.
         </h2>
         <p className="text-cream-300 mb-10 max-w-2xl mx-auto leading-relaxed text-lg">
-          The Cash safe view with Across + Bebop RFQ wired in, both directions. Opens on TSLAon
-          ready to execute end-to-end through our production integrator ID. Live quotes, live
-          execution, on-chain settlement, mainnet tx hashes already on record. Connect a wallet,
-          try it. Then let&rsquo;s talk about the rest.
+          Cash safe view with Across + Bebop RFQ wired in, both directions, opens on TSLAon
+          ready to execute end-to-end through our production integrator ID. Mainnet tx hashes
+          on record. The Path A reference is in the repo with the full Bebop&nbsp;&rarr;&nbsp;Across
+          actions mapping, ready for ether.fi&rsquo;s team to adapt. Two to three days from
+          green-light to live.
         </p>
-        <Link href="/cash" className="btn-gold inline-block">
-          Open the live PoC →
-        </Link>
+        <div className="flex flex-wrap gap-3 justify-center">
+          <Link href="/cash" className="btn-gold inline-block">
+            Open the live PoC &rarr;
+          </Link>
+          <a
+            href="https://github.com/bitc0x/etherfi-cash-across-poc/blob/main/PATH_A_REFERENCE.md"
+            target="_blank"
+            rel="noreferrer"
+            className="btn-outline-gold inline-block"
+          >
+            Read the Path A reference &rarr;
+          </a>
+        </div>
       </div>
     </section>
   );

@@ -34,7 +34,7 @@
  *     npx tsx scripts/path-a-reference.ts
  */
 
-import { decodeAbiParameters, encodeFunctionData } from 'viem';
+import { decodeAbiParameters } from 'viem';
 
 // =============================================================================
 // CONSTANTS
@@ -50,8 +50,9 @@ const USDC_ETH = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
 // bridge fill, and the contract that executes the embedded Bebop action.
 const MULTICALL_HANDLER_ETH = '0x924a9f036260DdD5808007E1AA95f08eD08aA569';
 
-// BebopBlend settlement contract on Ethereum. Same address all chains.
-const BEBOP_SETTLEMENT_ETH = '0xbbbbbBB520d69a9775E85b458C58c648259FAD5F';
+// Note: BebopBlend's settlement address (0xbbbbbBB520d69a9775E85b458C58c648259FAD5F)
+// is returned dynamically in bebopQuote.tx.to. We use that rather than hardcoding,
+// in case Bebop updates the routing for specific token pairs.
 
 // Seven Bebop-buyable Ondo GM tickers as of May 2026. To find more,
 // query Bebop's /pmm/ethereum/v3/tokens endpoint.
