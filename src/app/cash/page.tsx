@@ -827,7 +827,7 @@ export default function CashDemo() {
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="text-xs tabular text-cream-200">
-                      Atomic destination action on Ethereum
+                      Bebop RFQ on Ethereum
                     </span>
                     <span className="text-[10px] text-cream-500">
                       ({stockQuote.bebop.outputAmountDecimal.toFixed(6)} {selectedAsset?.symbol} @ ${stockQuote.bebop.pricePerShare.toFixed(2)}/share)
@@ -1137,12 +1137,13 @@ function DemoBanner() {
       <div className="text-sm leading-relaxed">
         <span className="font-semibold gold-text">Live PoC.</span>{' '}
         <span className="text-cream-200">
-          The Across Swap API executing end-to-end on mainnet for Ondo GM tokens. Opens with
-          TSLAon. The Buy button works for TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon,
-          CRCLon (~2s, zero slippage on the destination leg). AAPLon, SPYon, QQQon render the
-          architecture preview only (awaiting market-maker coverage). USDY and the live yield
-          assets below use the vanilla Across Swap API path. Integration reference for ether.fi
-          is published in the repo.
+          Opens with TSLAon (Ondo&rsquo;s tokenized Tesla). For TSLAon, NVDAon, GOOGLon,
+          COINon, HOODon, MSTRon, CRCLon the Buy button executes end-to-end on mainnet: the
+          Across Swap API delivers USDC to Ethereum and MulticallHandler atomically calls
+          Bebop&rsquo;s RFQ network to fill the order (~2s, zero slippage on the RFQ leg).
+          AAPLon, SPYon, QQQon render the architecture preview only (awaiting Bebop coverage).
+          USDY and the live yield assets below use the direct Across Swap API path with no
+          Bebop leg. Integration reference for ether.fi is published in the repo.
         </span>
       </div>
     </div>
@@ -1425,7 +1426,7 @@ function FlowExplainer({ asset, mode }: { asset: string; mode: Mode }) {
     {
       i: '3',
       t: 'Embedded action',
-      d: `MulticallHandler executes the destination action and delivers ${asset || 'the target asset'} atomically on Ethereum.`,
+      d: `MulticallHandler calls Bebop RFQ and delivers ${asset || 'the target asset'} atomically on Ethereum.`,
     },
     {
       i: '✓',
@@ -1539,7 +1540,7 @@ function StockArchitecturePreview({
         </h3>
         <p className="text-xs text-cream-400 leading-relaxed mb-5 max-w-2xl">
           {isBuy
-            ? `${symbol} is awaiting secondary-market liquidity. The architecture below is identical to the seven already-live Ondo GM tickers (TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, CRCLon), which execute end-to-end today via the Across Swap API.`
+            ? `${symbol} is awaiting Bebop secondary-market coverage. The architecture below is identical to the seven already-live Ondo GM tickers (TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, CRCLon), which execute end-to-end today via the Across Swap API with Bebop RFQ on the destination leg.`
             : `${symbol} is redeemed back to USDC on Ethereum and returns to the Cash safe via Across. Same architecture as the Buy direction, in reverse.`}
         </p>
 
@@ -1571,10 +1572,10 @@ function StockArchitecturePreview({
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-xs font-semibold text-cream-100 mb-1">
-                Live execution: pick a supported Ondo GM ticker
+                Live execution: pick a Bebop-routable Ondo GM ticker
               </div>
               <div className="text-[11px] text-cream-400 leading-relaxed mb-3">
-                TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, and CRCLon execute end-to-end on mainnet right now via the Across Swap API. Same architecture as above, atomic, ~2 seconds, zero slippage on the destination leg.
+                TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, and CRCLon execute end-to-end on mainnet right now via the Across Swap API with Bebop RFQ on the destination leg. Same architecture as above, atomic, ~2 seconds, zero slippage on the RFQ fill.
               </div>
               <button
                 onClick={onSwitchToUsdy}

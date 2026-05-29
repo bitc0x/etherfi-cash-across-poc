@@ -82,10 +82,10 @@ function Hero() {
       <p className="text-lg text-cream-300 max-w-3xl mb-10 leading-relaxed">
         Cash holds USDC on Optimism. TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, CRCLon and
         the wider Ondo Global Markets family live on Ethereum. One signature in Cash, the Across
-        Swap API delivers USDC to Ethereum and executes the Ondo GM purchase inside the same
-        atomic transaction. ~2 seconds, zero slippage on the destination leg, no vault to deploy,
-        no Ondo onboarding required. Same plumbing covers USDY, sUSDe, weETH, and anything else
-        Ethereum-only.
+        Swap API delivers USDC to Ethereum and the destination action calls Bebop&rsquo;s RFQ
+        network atomically inside the same transaction. ~2 seconds, zero slippage on the RFQ
+        fill, no vault to deploy, no Ondo onboarding required. Same plumbing covers USDY, sUSDe,
+        weETH, and anything else Ethereum-only.
       </p>
       <div className="flex flex-wrap gap-3">
         <Link href="/cash" className="btn-gold">
@@ -141,9 +141,10 @@ function LiveReceipt() {
         </h2>
         <p className="text-cream-300 max-w-3xl mb-7 leading-relaxed">
           Across has already executed this end-to-end on Ethereum mainnet from a Cash-style
-          USDC-on-Optimism flow. The Swap API delivered USDC and triggered the Ondo GM purchase
-          inside the same atomic transaction. One signature, ~2 seconds, zero slippage on the
-          destination leg. Same path covers all seven supported Ondo GM tickers today.
+          USDC-on-Optimism flow. The Swap API delivered USDC to MulticallHandler, which called
+          Bebop&rsquo;s RFQ settlement contract atomically and routed the TSLAon to the
+          recipient. One signature, ~2 seconds, zero slippage on the RFQ fill. Same path covers
+          all seven Bebop-routable Ondo GM tickers today.
         </p>
 
         {/* Receipt summary: input -> output flow */}
@@ -156,12 +157,12 @@ function LiveReceipt() {
           <div className="rounded-xl bg-bg-700 border border-white/[0.06] p-4">
             <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-1.5">Received</div>
             <div className="text-xl tabular text-cream-50 font-semibold">0.002685 TSLAon</div>
-            <div className="text-[11px] text-cream-400 mt-0.5">on Ethereum, atomic delivery</div>
+            <div className="text-[11px] text-cream-400 mt-0.5">on Ethereum, atomic, Bebop RFQ fill</div>
           </div>
           <div className="rounded-xl bg-bg-700 border border-white/[0.06] p-4">
             <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-1.5">Path</div>
             <div className="text-sm text-cream-100 leading-tight">
-              Across SpokePool &rarr; MulticallHandler &rarr; destination action &rarr; recipient
+              Across SpokePool &rarr; MulticallHandler &rarr; Bebop RFQ &rarr; recipient
             </div>
             <div className="text-[11px] text-cream-400 mt-0.5">one transaction, atomic</div>
           </div>
@@ -209,7 +210,7 @@ function Unlock() {
       n: '01',
       tag: 'Ondo stocks, first',
       h: 'TSLAon, AAPLon, NVDAon, in Cash.',
-      p: "Ondo Global Markets is the largest tokenized equity platform onchain, 260+ US stocks and ETFs live on Ethereum. ether.fi Cash users can't reach them today because Cash is on Optimism. Across closes the gap: USDC leaves the OP safe via the Swap API, settles on Ethereum at the MulticallHandler in ~2 seconds, and an embedded action delivers the requested Ondo GM token in the same transaction. Zero slippage on the destination leg, recipient is ether.fi's choice (user wallet or Cash safe contract), market makers handling the destination leg are themselves Ondo-approved holders so no KYC primitive is required on ether.fi's side. Same Swap API path covers USDY, sUSDe, weETH, USDS, and any other Ethereum-only asset.",
+      p: "Ondo Global Markets is the largest tokenized equity platform onchain, 260+ US stocks and ETFs live on Ethereum. ether.fi Cash users can't reach them today because Cash is on Optimism. Across closes the gap: USDC leaves the OP safe via the Swap API, settles on Ethereum at the MulticallHandler in ~2 seconds, and a single embedded action calls Bebop's RFQ network to deliver the requested Ondo GM token in the same transaction. Bebop's market makers are themselves Ondo-approved holders, so ether.fi inherits compliance at the MM layer with no KYC primitive required on ether.fi's side. Zero slippage on the RFQ fill, recipient is ether.fi's choice (user wallet or Cash safe contract). Same Swap API path covers USDY, sUSDe, weETH, USDS, and any other Ethereum-only asset.",
     },
     {
       n: '02',
@@ -274,7 +275,7 @@ function OndoStocks() {
     { n: '01', t: 'USDC leaves OP', d: 'Cash safe debits via Across SpokePool. One user signature.' },
     { n: '02', t: 'Across settles on ETH', d: 'Relayer fronts USDC to the MulticallHandler in ~2 seconds, UMA-secured.' },
     { n: '03', t: 'MulticallHandler routes', d: 'Approves the destination liquidity source and executes the swap atomically inside the same fill. Across never holds funds.' },
-    { n: '04', t: 'Destination action delivers', d: 'Pre-signed maker order fills at the quoted amount. Zero slippage. Ondo GM token transferred directly to the recipient.' },
+    { n: '04', t: 'Bebop RFQ fills', d: 'Pre-signed maker order fills at the quoted amount. Zero slippage. Ondo GM token transferred directly to the recipient.' },
     { n: '\u2713', t: 'Abstracted in Cash UI', d: 'User sees TSLAon balance. Recipient is ether.fi\u2019s choice: user wallet or Cash safe. Sell path is symmetric.' },
   ];
 
@@ -288,9 +289,9 @@ function OndoStocks() {
         Ondo Global Markets is the largest tokenized equities platform onchain.{' '}
         <span className="text-cream-100">$1.5B TVL, $18B cumulative volume, 70% market share,
         260+ stocks and ETFs across Ethereum and BNB Chain.</span> The architecture below routes
-        Cash users into any supported Ondo GM token from their OP safe, in one signature. Seven
-        tickers are end-to-end executable today through the Across Swap API. We&rsquo;ve already
-        run a live mainnet TSLAon purchase.
+        Cash users into any supported Ondo GM token from their OP safe in one signature: Across
+        Swap API on the bridge leg, Bebop RFQ on the destination leg. Seven tickers are
+        end-to-end executable today. We&rsquo;ve already run a live mainnet TSLAon purchase.
       </p>
 
       {/* Stock grid */}
@@ -352,16 +353,17 @@ function OndoStocks() {
           <div className="rounded-xl bg-bg-700 border border-white/[0.06] p-4">
             <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-1.5">Why no onboarding is needed</div>
             <div className="text-xs text-cream-200 leading-relaxed">
-              Market makers handling the destination leg are themselves Ondo-approved holders.
-              ether.fi inherits compliance at the MM layer instead of deploying and onboarding
-              a vault. Zero infrastructure lift; ship today.
+              Bebop&rsquo;s market makers are themselves Ondo-approved holders. ether.fi inherits
+              compliance at the MM layer instead of deploying and onboarding a vault. Zero
+              infrastructure lift; ship today.
             </div>
           </div>
           <div className="rounded-xl bg-bg-700 border border-white/[0.06] p-4">
             <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-1.5">Same path for live yield assets</div>
             <div className="text-xs text-cream-200 leading-relaxed">
-              The architecture also handles USDY, sUSDe, sDAI, weETH, USDS via straight
-              token-to-token routing through the Across Swap API. PoC demo shows them live.
+              The architecture also handles USDY, sUSDe, sDAI, weETH, USDS without the Bebop
+              leg. These are direct token-to-token routes via the Across Swap API. PoC demo
+              shows them live.
             </div>
           </div>
           <div className="rounded-xl bg-bg-700 border border-white/[0.06] p-4">
@@ -395,8 +397,8 @@ function EmbeddedActions() {
         <p className="text-cream-300 max-w-2xl mb-12 leading-relaxed">
           Across destination actions let a user on OP execute an arbitrary call on Ethereum in
           one transaction. No second approval. No idle capital. No bridge UX to maintain. For
-          Ondo GM the destination action sources liquidity from approved market makers; the
-          same primitive handles any Ethereum-side action.
+          Ondo GM the destination action calls Bebop&rsquo;s RFQ settlement contract; the same
+          primitive handles any Ethereum-side action.
         </p>
 
         <div className="grid md:grid-cols-4 gap-4">
@@ -428,7 +430,7 @@ function ReturnLeg() {
   const outbound = [
     'USDC leaves the Cash safe on OP.',
     'Across relayer fills on Ethereum (~2s).',
-    'MulticallHandler executes the destination action atomically. Ondo GM token delivered to recipient.',
+    'MulticallHandler calls Bebop RFQ atomically. Ondo GM token delivered to recipient.',
   ];
   const inbound = [
     'User signs a sell of the Ondo GM token on Ethereum.',
@@ -519,7 +521,7 @@ function Architecture() {
     '40+ independent relayers',
     'SpokePool contracts, audited',
     'MulticallHandler for embedded actions',
-    'Destination action routing for Ondo GM tokens',
+    'Destination action routing (Bebop RFQ for Ondo GM)',
     'Settlement via UMA optimistic oracle',
     'Fill confirmation and status indexing',
     'Quote API with live pricing',
@@ -582,8 +584,8 @@ function Architecture() {
 function PathRoadmap() {
   const pathA = [
     'Across already delivers USDC atomically to Ethereum in ~2 seconds via the Swap API. The same call executes an embedded destination action in the same transaction.',
-    'For Ondo GM tokens, the destination action sources liquidity from market makers who hold the inventory. We&rsquo;ve open-sourced the full integration reference.',
-    'Light lift on ether.fi&rsquo;s side. Drop the action payload into your existing Across Swap API call.',
+    'For Ondo GM, the destination action calls Bebop\u2019s RFQ network, where Ondo-approved market makers fill at the quoted amount with zero slippage.',
+    'Light lift on ether.fi\u2019s side. Drop the action payload into your existing Across Swap API call. Full integration reference open-sourced.',
     'Live coverage today: TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, CRCLon.',
     'Already executed end-to-end on Ethereum mainnet through our production integrator ID.',
   ];
