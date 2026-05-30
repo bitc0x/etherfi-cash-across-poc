@@ -640,14 +640,12 @@ function PathRoadmap() {
             ))}
           </ul>
           <div className="mt-6 pt-6 border-t border-gold-500/15">
-            <a
-              href="https://github.com/bitc0x/etherfi-cash-across-poc/blob/main/PATH_A_REFERENCE.md"
-              target="_blank"
-              rel="noreferrer"
+            <Link
+              href="/reference"
               className="text-xs gold-text hover:underline font-semibold"
             >
               Read the integration reference &rarr;
-            </a>
+            </Link>
           </div>
         </div>
 
@@ -1023,14 +1021,9 @@ function FinalCTA() {
           <Link href="/cash" className="btn-gold inline-block">
             Open the live PoC &rarr;
           </Link>
-          <a
-            href="https://github.com/bitc0x/etherfi-cash-across-poc/blob/main/PATH_A_REFERENCE.md"
-            target="_blank"
-            rel="noreferrer"
-            className="btn-outline-gold inline-block"
-          >
+          <Link href="/reference" className="btn-outline-gold inline-block">
             Read the integration reference &rarr;
-          </a>
+          </Link>
         </div>
       </div>
     </section>

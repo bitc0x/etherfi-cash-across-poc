@@ -136,3 +136,29 @@ body {
 input[type=number]::-webkit-inner-spin-button,
 input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
 input[type=number] { -moz-appearance: textfield; }
+
+/* Code styles for reference page */
+.inline-code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.85em;
+  background: rgba(212, 175, 55, 0.08);
+  color: var(--gold);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(212, 175, 55, 0.15);
+  word-break: break-all;
+}
+
+.code-block {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.65;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border-soft);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  overflow-x: auto;
+  color: var(--text-secondary);
+  white-space: pre;
+  margin: 0;
+}
