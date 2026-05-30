@@ -1143,7 +1143,11 @@ function DemoBanner() {
           Bebop&rsquo;s RFQ network to fill the order (~2s, zero slippage on the RFQ leg).
           AAPLon, SPYon, QQQon render the architecture preview only (awaiting Bebop coverage).
           USDY and the live yield assets below use the direct Across Swap API path with no
-          Bebop leg. Integration reference for ether.fi is published in the repo.
+          Bebop leg. Integration reference for ether.fi:{' '}
+          <a href="/reference" className="gold-text hover:underline font-semibold">
+            etherfi-cash-across-poc.vercel.app/reference
+          </a>
+          .
         </span>
       </div>
     </div>

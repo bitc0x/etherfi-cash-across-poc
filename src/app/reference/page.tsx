@@ -5,6 +5,19 @@ export const metadata = {
   title: 'Integration Reference · ether.fi × Across',
   description:
     'How to wire Across\u2019s Swap API with embedded destination actions to access market-maker and DEX-aggregator liquidity from any supported origin chain.',
+  openGraph: {
+    title: 'Integration Reference · ether.fi × Across',
+    description:
+      'How to wire Across\u2019s Swap API for 1inch, 0x, Bebop, Paraswap, Odos, Kyberswap, Hashflow, or any custom router. One integration, N liquidity sources.',
+    images: ['/etherfi-logo.png'],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Integration Reference · ether.fi × Across',
+    description:
+      'One Across integration, N liquidity sources. 1inch, 0x, Bebop, Paraswap, Odos, Kyberswap, or custom routers.',
+    images: ['/etherfi-logo.png'],
+  },
 };
 
 export default function ReferencePage() {

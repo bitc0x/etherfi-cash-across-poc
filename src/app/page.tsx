@@ -1036,6 +1036,9 @@ function Footer() {
       <div className="max-w-6xl mx-auto px-6 py-10 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-cream-400">
         <div>Built for ether.fi by Across. Risk Labs, 2026.</div>
         <div className="flex items-center gap-5">
+          <Link href="/reference" className="hover:text-cream-100">
+            Integration reference
+          </Link>
           <a href="https://across.to" target="_blank" rel="noreferrer" className="hover:text-cream-100">
             across.to
           </a>
