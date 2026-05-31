@@ -24,13 +24,26 @@ type Quote = {
   };
 };
 
-// Response shape from /api/build-deposit (Across + Bebop RFQ + MulticallHandler path).
-// Used for Bebop-buyable Ondo GM stocks; the existing Quote type is used for the
-// vanilla Across Swap API path.
+// Response shape from /api/build-deposit (Across + destination-leg + MulticallHandler path).
+// Used for Ondo GM stocks routed through either Bebop RFQ or 1inch Aggregation;
+// the existing Quote type is used for the vanilla Across Swap API path.
 type StockQuote = {
   spokePool: string;
   transaction: { to: string; data: string; value: string; chainId: number };
   bridge: { inputAmount: string; expectedOutputAmount: string; acrossFeeBps: number };
+  destination: {
+    source: 'bebop' | 'oneinch-aggregation';
+    sourceLabel: string;
+    target: string;
+    approvalSpender: string;
+    outputAmount: string;
+    outputAmountDecimal: number;
+    outputSymbol: string;
+    outputDecimals: number;
+    pricePerShare: number | null;
+    expiry?: number;
+  };
+  // Backwards-compat: only populated when source = 'bebop'
   bebop: {
     outputAmount: string;
     outputAmountDecimal: number;
@@ -48,6 +61,8 @@ type StockQuote = {
     fillDeadline: number;
   };
 };
+
+type LiquiditySource = 'bebop' | 'oneinch-aggregation';
 
 type Phase =
   | 'idle'
@@ -108,6 +123,7 @@ export default function CashDemo() {
   const [error, setError] = useState<string | null>(null);
   const [originTxHash, setOriginTxHash] = useState<string | null>(null);
   const [fillTxHash, setFillTxHash] = useState<string | null>(null);
+  const [liquiditySource, setLiquiditySource] = useState<LiquiditySource>('bebop');
 
   // Fetch chains + Ethereum tokens once
   useEffect(() => {
@@ -250,6 +266,7 @@ export default function CashDemo() {
               recipient: address,
               inputAmount: raw.toString(),
               outputToken: selectedAsset.token!.address,
+              source: liquiditySource,
             }),
             signal: ctrl.signal,
           });
@@ -326,7 +343,7 @@ export default function CashDemo() {
       clearTimeout(t);
       ctrl.abort();
     };
-  }, [address, amount, selectedAsset, mode, isStockSelected, isBebopSelected]);
+  }, [address, amount, selectedAsset, mode, isStockSelected, isBebopSelected, liquiditySource]);
 
   const feePct = useMemo(() => {
     const raw = quote?.fees?.total?.pct;
@@ -609,6 +626,49 @@ export default function CashDemo() {
             </div>
 
             <div className="space-y-2">
+              {/* Liquidity source toggle: only relevant for Bebop-buyable Ondo GM
+                  stocks in Buy mode, where the destination action sources liquidity
+                  from either Bebop RFQ or 1inch Aggregation. Other paths (yield assets,
+                  Sell mode, preview-only stocks) don't expose a source choice. */}
+              {isStockSelected && isBebopSelected && mode === 'buy' && (
+                <div className="card-inner p-3.5 flex items-center justify-between gap-3 flex-wrap">
+                  <div className="min-w-0">
+                    <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-0.5">
+                      Destination liquidity
+                    </div>
+                    <div className="text-[11px] text-cream-400 leading-tight">
+                      Across delivers USDC to MulticallHandler; this is what executes the swap on Ethereum.
+                    </div>
+                  </div>
+                  <div className="flex items-center bg-bg-700 rounded-full p-0.5 border border-white/[0.05] flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setLiquiditySource('bebop')}
+                      className={
+                        'px-3 py-1.5 rounded-full text-[11px] font-semibold tracking-tight transition-colors ' +
+                        (liquiditySource === 'bebop'
+                          ? 'bg-gold-500 text-[#1A140A]'
+                          : 'text-cream-300 hover:text-cream-100')
+                      }
+                    >
+                      Bebop RFQ
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLiquiditySource('oneinch-aggregation')}
+                      className={
+                        'px-3 py-1.5 rounded-full text-[11px] font-semibold tracking-tight transition-colors ' +
+                        (liquiditySource === 'oneinch-aggregation'
+                          ? 'bg-gold-500 text-[#1A140A]'
+                          : 'text-cream-300 hover:text-cream-100')
+                      }
+                    >
+                      1inch Aggregation
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* FROM card */}
               <div className="card-inner p-5">
                 <div className="text-[11px] uppercase tracking-widest text-cream-400 mb-3">
@@ -697,9 +757,10 @@ export default function CashDemo() {
                   <input
                     readOnly
                     value={(() => {
-                      // Bebop-buyable stock (Buy mode): show live Bebop RFQ output amount.
-                      if (isStockSelected && isBebopSelected && mode === 'buy' && stockQuote?.bebop) {
-                        return stockQuote.bebop.outputAmountDecimal.toFixed(6);
+                      // Bebop-buyable stock (Buy mode): show live destination-leg output amount,
+                      // regardless of whether the source is Bebop or 1inch Aggregation.
+                      if (isStockSelected && isBebopSelected && mode === 'buy' && stockQuote?.destination) {
+                        return stockQuote.destination.outputAmountDecimal.toFixed(6);
                       }
                       // Preview-only stocks: compute from mock price (no live route).
                       if (isStockSelected && selectedAsset?.symbol) {
@@ -819,24 +880,33 @@ export default function CashDemo() {
 
             {/* Bebop RFQ preview row - only when on the Bebop path, shows the live
                 executable price per share and the makers behind the order. */}
-            {stockQuote?.bebop && (
+            {stockQuote?.destination && (
               <div className="mt-3 rounded-xl border border-white/[0.05] bg-bg-700/40 px-3.5 py-2.5 flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-0.5">
                     Destination route
                   </div>
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="text-xs tabular text-cream-200">
-                      Bebop RFQ on Ethereum
+                      {stockQuote.destination.sourceLabel} on Ethereum
                     </span>
                     <span className="text-[10px] text-cream-500">
-                      ({stockQuote.bebop.outputAmountDecimal.toFixed(6)} {selectedAsset?.symbol} @ ${stockQuote.bebop.pricePerShare.toFixed(2)}/share)
+                      ({stockQuote.destination.outputAmountDecimal.toFixed(6)} {selectedAsset?.symbol}
+                      {stockQuote.destination.pricePerShare != null
+                        ? ` @ $${stockQuote.destination.pricePerShare.toFixed(2)}/share`
+                        : ''})
                     </span>
                   </div>
                 </div>
-                <span className="px-2 py-0.5 rounded-full bg-gold-500/20 border border-gold-500/30 text-gold-300 font-semibold text-[10px] tracking-wider">
-                  ZERO SLIPPAGE
-                </span>
+                {stockQuote.destination.source === 'bebop' ? (
+                  <span className="px-2 py-0.5 rounded-full bg-gold-500/20 border border-gold-500/30 text-gold-300 font-semibold text-[10px] tracking-wider flex-shrink-0">
+                    ZERO SLIPPAGE
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded-full bg-cream-500/15 border border-cream-500/25 text-cream-200 font-semibold text-[10px] tracking-wider flex-shrink-0">
+                    MULTI-DEX
+                  </span>
+                )}
               </div>
             )}
 

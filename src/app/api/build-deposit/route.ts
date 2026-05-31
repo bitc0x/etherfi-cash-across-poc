@@ -65,12 +65,39 @@ const INSTRUCTIONS_TUPLE = {
   ],
 } as const;
 
+// Token metadata for output-amount formatting. The Bebop quote response
+// carries decimals + symbol natively (we use those for the bebop path).
+// 1inch's /swap response does NOT include them, so we look up known tokens
+// here. Unknown tokens default to 18 decimals (ERC20 standard), which is
+// correct for every Ondo GM token and most ERC20s; if we ever route into
+// a non-18-decimal token via 1inch, this needs an on-chain decimals() call.
+const TOKEN_META: Record<string, { symbol: string; decimals: number }> = {
+  // Ondo GM tokens (18 decimals)
+  '0xf6b1117ec07684d3958cad8beb1b302bfd21103f': { symbol: 'TSLAon', decimals: 18 },
+  '0x2d1f7226bd1f780af6b9a49dcc0ae00e8df4bdee': { symbol: 'NVDAon', decimals: 18 },
+  '0xba47214edd2bb43099611b208f75e4b42fdcfedc': { symbol: 'GOOGLon', decimals: 18 },
+  // Stablecoins (6 decimals)
+  '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48': { symbol: 'USDC', decimals: 6 },
+  '0xdac17f958d2ee523a2206206994597c13d831ec7': { symbol: 'USDT', decimals: 6 },
+  // WETH + ETH-yield (18 decimals)
+  '0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2': { symbol: 'WETH', decimals: 18 },
+  '0xcd5fe23c85820f7b72d0926fc9b05b43e359b7ee': { symbol: 'weETH', decimals: 18 },
+  // sUSDe + other yield assets (18 decimals)
+  '0x9d39a5de30e57443bff2a8307a4256c8797a3497': { symbol: 'sUSDe', decimals: 18 },
+};
+function lookupTokenMeta(address: string): { symbol: string; decimals: number } {
+  const found = TOKEN_META[address.toLowerCase()];
+  if (found) return found;
+  return { symbol: address.slice(0, 6) + '...' + address.slice(-4), decimals: 18 };
+}
+
 export async function POST(req: NextRequest) {
   let body: {
     depositor?: string;
     recipient?: string;
     inputAmount?: string;
     outputToken?: string;
+    source?: 'bebop' | 'oneinch-aggregation';
   };
   try {
     body = await req.json();
@@ -79,10 +106,17 @@ export async function POST(req: NextRequest) {
   }
 
   const { depositor, recipient, inputAmount, outputToken } = body;
+  const source = body.source || 'bebop';
 
   if (!depositor || !inputAmount || !outputToken) {
     return NextResponse.json(
       { error: 'missing required fields: depositor, inputAmount, outputToken' },
+      { status: 400 },
+    );
+  }
+  if (source !== 'bebop' && source !== 'oneinch-aggregation') {
+    return NextResponse.json(
+      { error: `invalid source '${source}'. supported: 'bebop', 'oneinch-aggregation'` },
       { status: 400 },
     );
   }
@@ -138,51 +172,155 @@ export async function POST(req: NextRequest) {
   const fillDeadline = now + 6 * 60 * 60; // 6 hours
 
   // -----------------------------------------------------------------------
-  // Step 2: Bebop quote. Sell exactly what MulticallHandler will receive.
-  // taker = MulticallHandler (so the tx.data is callable with msg.sender = MulticallHandler).
-  // receiver = the user's wallet (TSLAon lands directly there).
+  // Step 2: destination-leg quote. Source-specific.
+  //
+  //   Bebop:               taker=MulticallHandler, receiver=user, RFQ pre-signed
+  //   1inch Aggregation:   from=MulticallHandler, receiver=user, multi-DEX route
+  //
+  // Both yield the same shape downstream: a target contract + calldata
+  // that MulticallHandler will execute after USDC arrives.
   // -----------------------------------------------------------------------
-  let bebopQuote: {
-    settlementAddress: string;
-    approvalTarget: string;
-    expiry: number;
-    tx: { to: string; data: string; value: string };
-    buyTokens: Record<string, { amount: string; minimumAmount?: string; symbol: string; decimals: number; priceUsd: number }>;
+  type DestinationLeg = {
+    target: Hex;
+    callData: Hex;
+    value: bigint;
+    approvalSpender: Hex;       // contract to grant USDC allowance to
+    outputAmount: string;        // raw base units
+    outputAmountDecimal: number; // for UI display
+    outputSymbol: string;
+    outputDecimals: number;
+    pricePerShare: number | null;
+    sourceLabel: string;
+    expiry?: number;             // optional expiry hint
   };
-  try {
-    const bebopUrl = new URL('https://api.bebop.xyz/pmm/ethereum/v3/quote');
-    bebopUrl.searchParams.set('sell_tokens', USDC_ETH_ADDRESS);
-    bebopUrl.searchParams.set('buy_tokens', outputToken);
-    bebopUrl.searchParams.set('sell_amounts', usdcArrivingAtHandler.toString());
-    bebopUrl.searchParams.set('taker_address', MULTICALL_HANDLER_ETH);
-    bebopUrl.searchParams.set('receiver_address', finalRecipient);
-    bebopUrl.searchParams.set('gasless', 'false');
 
-    const headers: Record<string, string> = { Accept: 'application/json' };
-    if (process.env.BEBOP_API_KEY) headers['source-auth'] = process.env.BEBOP_API_KEY;
+  let dest: DestinationLeg;
 
-    const r = await fetch(bebopUrl.toString(), { headers, cache: 'no-store' });
-    if (!r.ok) {
-      const text = await r.text();
-      return NextResponse.json({ error: 'bebop quote failed', detail: text }, { status: 502 });
+  if (source === 'bebop') {
+    let bebopQuote: {
+      settlementAddress: string;
+      approvalTarget: string;
+      expiry: number;
+      tx: { to: string; data: string; value: string };
+      buyTokens: Record<string, { amount: string; minimumAmount?: string; symbol: string; decimals: number; priceUsd: number }>;
+    };
+    try {
+      const bebopUrl = new URL('https://api.bebop.xyz/pmm/ethereum/v3/quote');
+      bebopUrl.searchParams.set('sell_tokens', USDC_ETH_ADDRESS);
+      bebopUrl.searchParams.set('buy_tokens', outputToken);
+      bebopUrl.searchParams.set('sell_amounts', usdcArrivingAtHandler.toString());
+      bebopUrl.searchParams.set('taker_address', MULTICALL_HANDLER_ETH);
+      bebopUrl.searchParams.set('receiver_address', finalRecipient);
+      bebopUrl.searchParams.set('gasless', 'false');
+
+      const headers: Record<string, string> = { Accept: 'application/json' };
+      if (process.env.BEBOP_API_KEY) headers['source-auth'] = process.env.BEBOP_API_KEY;
+
+      const r = await fetch(bebopUrl.toString(), { headers, cache: 'no-store' });
+      if (!r.ok) {
+        const text = await r.text();
+        return NextResponse.json({ error: 'bebop quote failed', detail: text }, { status: 502 });
+      }
+      bebopQuote = await r.json();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'bebop quote fetch failed';
+      return NextResponse.json({ error: msg }, { status: 500 });
     }
-    bebopQuote = await r.json();
-  } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'bebop quote fetch failed';
-    return NextResponse.json({ error: msg }, { status: 500 });
-  }
 
-  if (!bebopQuote.tx?.data || !bebopQuote.settlementAddress) {
-    return NextResponse.json({ error: 'bebop returned no tx data', detail: bebopQuote }, { status: 502 });
+    if (!bebopQuote.tx?.data || !bebopQuote.settlementAddress) {
+      return NextResponse.json({ error: 'bebop returned no tx data', detail: bebopQuote }, { status: 502 });
+    }
+
+    const buyEntries = Object.entries(bebopQuote.buyTokens || {});
+    const buyInfo = buyEntries[0]?.[1];
+    if (!buyInfo) {
+      return NextResponse.json({ error: 'bebop returned no buyTokens info' }, { status: 502 });
+    }
+
+    dest = {
+      target: bebopQuote.settlementAddress as Hex,
+      callData: bebopQuote.tx.data as Hex,
+      value: BigInt(bebopQuote.tx.value || '0'),
+      approvalSpender: bebopQuote.settlementAddress as Hex,
+      outputAmount: buyInfo.amount,
+      outputAmountDecimal: Number(BigInt(buyInfo.amount)) / 10 ** buyInfo.decimals,
+      outputSymbol: buyInfo.symbol,
+      outputDecimals: buyInfo.decimals,
+      pricePerShare: buyInfo.priceUsd ?? null,
+      sourceLabel: 'Bebop RFQ',
+      expiry: bebopQuote.expiry,
+    };
+  } else {
+    // 1inch Aggregation API
+    if (!process.env.ONEINCH_API_KEY) {
+      return NextResponse.json(
+        { error: '1inch API key not configured on server (set ONEINCH_API_KEY)' },
+        { status: 503 },
+      );
+    }
+
+    let oneinchQuote: {
+      dstAmount: string;
+      tx: { to: string; data: string; value: string };
+    };
+    try {
+      const oiUrl = new URL('https://api.1inch.dev/swap/v6.0/1/swap');
+      oiUrl.searchParams.set('src', USDC_ETH_ADDRESS);
+      oiUrl.searchParams.set('dst', outputToken);
+      oiUrl.searchParams.set('amount', usdcArrivingAtHandler.toString());
+      oiUrl.searchParams.set('from', MULTICALL_HANDLER_ETH);
+      oiUrl.searchParams.set('receiver', finalRecipient);
+      oiUrl.searchParams.set('slippage', '1');
+      oiUrl.searchParams.set('disableEstimate', 'true');
+
+      const r = await fetch(oiUrl.toString(), {
+        headers: {
+          Authorization: `Bearer ${process.env.ONEINCH_API_KEY}`,
+          Accept: 'application/json',
+        },
+        cache: 'no-store',
+      });
+      if (!r.ok) {
+        const text = await r.text();
+        return NextResponse.json({ error: '1inch quote failed', detail: text.slice(0, 500) }, { status: 502 });
+      }
+      oneinchQuote = await r.json();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : '1inch quote fetch failed';
+      return NextResponse.json({ error: msg }, { status: 500 });
+    }
+
+    if (!oneinchQuote.tx?.data || !oneinchQuote.tx?.to) {
+      return NextResponse.json({ error: '1inch returned no tx data', detail: oneinchQuote }, { status: 502 });
+    }
+
+    // Look up output token decimals + symbol from our static registry. We
+    // already maintain token metadata for the UI; trust it for display.
+    const outputMeta = lookupTokenMeta(outputToken);
+
+    dest = {
+      target: oneinchQuote.tx.to as Hex,
+      callData: oneinchQuote.tx.data as Hex,
+      value: BigInt(oneinchQuote.tx.value || '0'),
+      approvalSpender: oneinchQuote.tx.to as Hex, // 1inch router is its own spender
+      outputAmount: oneinchQuote.dstAmount,
+      outputAmountDecimal: Number(BigInt(oneinchQuote.dstAmount)) / 10 ** outputMeta.decimals,
+      outputSymbol: outputMeta.symbol,
+      outputDecimals: outputMeta.decimals,
+      pricePerShare: null,
+      sourceLabel: '1inch Aggregation',
+    };
   }
 
   // -----------------------------------------------------------------------
-  // Step 3: Encode the two Call elements.
+  // Step 3: encode the two Call elements.
+  //   Call 1: USDC.approve(approvalSpender, usdcArrivingAtHandler)
+  //   Call 2: target.<dest.callData>
   // -----------------------------------------------------------------------
   const approveCalldata = encodeFunctionData({
     abi: ERC20_ABI,
     functionName: 'approve',
-    args: [bebopQuote.settlementAddress as Hex, usdcArrivingAtHandler],
+    args: [dest.approvalSpender, usdcArrivingAtHandler],
   });
 
   const calls = [
@@ -192,9 +330,9 @@ export async function POST(req: NextRequest) {
       value: 0n,
     },
     {
-      target: bebopQuote.settlementAddress as Hex,
-      callData: bebopQuote.tx.data as Hex,
-      value: BigInt(bebopQuote.tx.value || '0'),
+      target: dest.target,
+      callData: dest.callData,
+      value: dest.value,
     },
   ];
 
@@ -236,11 +374,9 @@ export async function POST(req: NextRequest) {
   });
 
   // -----------------------------------------------------------------------
-  // Bebop preview for the UI.
+  // Destination-leg preview for the UI. Source-agnostic field names so the
+  // frontend can render identically across providers.
   // -----------------------------------------------------------------------
-  const buyEntries = Object.entries(bebopQuote.buyTokens || {});
-  const buyInfo = buyEntries[0]?.[1];
-
   return NextResponse.json({
     spokePool: SPOKE_POOL_OP,
     transaction: {
@@ -254,15 +390,30 @@ export async function POST(req: NextRequest) {
       expectedOutputAmount: usdcArrivingAtHandler.toString(),
       acrossFeeBps: Number(((BigInt(inputAmount) - usdcArrivingAtHandler) * 10000n) / BigInt(inputAmount)),
     },
-    bebop: buyInfo
+    destination: {
+      source,
+      sourceLabel: dest.sourceLabel,
+      target: dest.target,
+      approvalSpender: dest.approvalSpender,
+      outputAmount: dest.outputAmount,
+      outputAmountDecimal: dest.outputAmountDecimal,
+      outputSymbol: dest.outputSymbol,
+      outputDecimals: dest.outputDecimals,
+      pricePerShare: dest.pricePerShare,
+      expiry: dest.expiry,
+    },
+    // Backwards-compat: keep the original `bebop` field name when Bebop is
+    // the source, so existing UI code that reads response.bebop still works
+    // without changes during the migration.
+    bebop: source === 'bebop'
       ? {
-          outputAmount: buyInfo.amount,
-          outputAmountDecimal: Number(BigInt(buyInfo.amount)) / 10 ** buyInfo.decimals,
-          outputSymbol: buyInfo.symbol,
-          outputDecimals: buyInfo.decimals,
-          pricePerShare: buyInfo.priceUsd,
-          settlementAddress: bebopQuote.settlementAddress,
-          expiry: bebopQuote.expiry,
+          outputAmount: dest.outputAmount,
+          outputAmountDecimal: dest.outputAmountDecimal,
+          outputSymbol: dest.outputSymbol,
+          outputDecimals: dest.outputDecimals,
+          pricePerShare: dest.pricePerShare,
+          settlementAddress: dest.target,
+          expiry: dest.expiry,
         }
       : null,
     deposit: {
