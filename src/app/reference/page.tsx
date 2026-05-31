@@ -156,6 +156,13 @@ function Flow() {
       <h2 className="font-serif text-3xl md:text-4xl gold-text mb-5 tracking-tightest">
         Five steps, one user signature.
       </h2>
+      <div className="rounded-xl border border-gold-500/20 bg-gold-500/[0.04] px-4 py-3 mb-5 text-sm text-cream-200 leading-relaxed">
+        <span className="font-semibold gold-text">Synchronous-source path.</span> This section
+        describes the atomic flow that applies to <span className="text-cream-100">Bebop, 1inch
+        Aggregation, 0x, Paraswap, Odos, Kyberswap, Hashflow</span>, and any custom router
+        invoked via MulticallHandler. For <span className="text-cream-100">1inch Fusion</span>{' '}
+        (async limit-order pattern), see section 07.
+      </div>
       <pre className="code-block">
 {`User on Cash UI                          Liquidity source (1inch/Bebop/etc.)        Across API
        │                                              │                                  │
@@ -315,7 +322,7 @@ function Invariants() {
     ],
     [
       'populateDynamically: false for RFQ orders',
-      'A maker signature is over the exact amounts. Dynamic balance population would invalidate it. AMM aggregators can use dynamic population if their swap function supports it.',
+      'For Bebop, Hashflow, and other RFQ sources, the market maker signs an order that commits to a specific filledTakerAmount. If you set populateDynamically: true, MulticallHandler would overwrite that field at execution time with the actual USDC balance it received, which no longer matches what the MM signed, and the order rejects on signature verification. Keep it false for RFQ. AMM aggregators (1inch Aggregation, Uniswap V3 router) can use dynamic population if the called function supports it, since AMMs price off pool state rather than a signed quote.',
     ],
   ];
   return (
@@ -358,8 +365,11 @@ function Atomic() {
         MulticallHandler&rsquo;s{' '}
         <code className="inline-code">handleV3AcrossMessage</code> reverts the entire fill. The
         relayer&rsquo;s <code className="inline-code">fillV3Relay</code> transaction reverts.
-        The user&rsquo;s USDC stays on the origin chain and is refunded after the
-        <code className="inline-code">fillDeadline</code> (default 6 hours).
+        The user&rsquo;s USDC stays on the origin chain and is refunded to{' '}
+        <code className="inline-code">fallbackRecipient</code> after the{' '}
+        <code className="inline-code">fillDeadline</code> (Across&rsquo;s{' '}
+        <code className="inline-code">/swap/approval</code> currently returns ~2 hours from
+        deposit time by default; integrator-configurable).
       </p>
       <p className="text-cream-300 leading-relaxed">
         No partial state. No stuck funds at MulticallHandler. Materially safer than a sequential
@@ -452,11 +462,33 @@ function AsyncPattern() {
         order&rsquo;s <code className="inline-code">auctionEndAmount</code>: resolvers cannot
         fill below it.
       </p>
-      <p className="text-cream-300 leading-relaxed mb-7">
+      <p className="text-cream-300 leading-relaxed mb-5">
         This is two user signatures total: one for the Across deposit transaction on Optimism,
         one for the EIP-712 Fusion order on Ethereum. Plus one-time ERC20 approvals at first
-        use. See the flow below.
+        use. The PoC signs <span className="text-cream-100">sequentially</span> (Across first,
+        wait for delivery, then Fusion) rather than capturing both signatures upfront. The
+        reason: signing the Fusion order <span className="text-cream-100">after</span> USDC
+        arrival lets us set <code className="inline-code">makingAmount</code> to the exact
+        post-bridge USDC balance, so the resolver fills against a known quantity. Signing
+        upfront with an estimated amount risks small partial fills or rejections if Across
+        fees drift between quote and delivery. Both orderings are valid; the doc describes
+        what the PoC does.
       </p>
+
+      {/* SDK install + package callout - engineers want exact npm command */}
+      <div className="rounded-xl border border-white/[0.05] bg-bg-700/40 p-4 mb-7">
+        <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-2">
+          Fusion SDK package
+        </div>
+        <pre className="code-block !mb-2">{`npm install @1inch/fusion-sdk@2`}</pre>
+        <div className="text-[11px] text-cream-400 leading-snug">
+          NOT <code className="inline-code">@1inch/cross-chain-sdk</code> &mdash; that&rsquo;s
+          Fusion+ for cross-chain swaps. We don&rsquo;t need it here because Across handles the
+          cross-chain leg and Fusion runs the Ethereum-side swap only. Used server-side in the
+          PoC (kept off the client bundle) to construct the EIP-712 order from quotes; the
+          client signs via viem&rsquo;s <code className="inline-code">signTypedData</code>.
+        </div>
+      </div>
 
       <div className="rounded-2xl border border-white/[0.05] bg-bg-700/40 p-5 mb-5">
         <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-3">
@@ -527,6 +559,43 @@ function AsyncPattern() {
 
       <div className="rounded-2xl border border-white/[0.05] bg-bg-700/40 p-5 mb-5">
         <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-3">
+          Status polling endpoints
+        </div>
+        <p className="text-sm text-cream-300 leading-relaxed mb-3">
+          Two independent legs, two status streams. The PoC polls each on its own clock and
+          drives the UI off a phase enum (<code className="inline-code">bridging</code> &rarr;{' '}
+          <code className="inline-code">bridged</code> &rarr;{' '}
+          <code className="inline-code">signing-order</code> &rarr;{' '}
+          <code className="inline-code">submitting</code> &rarr;{' '}
+          <code className="inline-code">auction</code> &rarr;{' '}
+          <code className="inline-code">filled</code>).
+        </p>
+        <pre className="code-block !mb-3">{`# Across bridge leg (poll every 2-3s until status is "filled")
+GET https://app.across.to/api/deposit/status
+  ?originChainId=10
+  &depositTxHash=0x...           # tx hash from the depositV3 call on Optimism
+                                  # (alternative: ?depositId=... if you have the deposit id)
+
+# Returns: { status, depositId, fillTx, destinationChainId, ... }
+# status transitions: pending -> filled (typical ~2s) or expired (after fillDeadline)`}</pre>
+        <pre className="code-block !mb-2">{`# Fusion order leg (poll every 3s until status is "filled" or "expired")
+GET https://api.1inch.dev/fusion/orders/v2.0/{chainId}/order/status/{orderHash}
+  Authorization: Bearer {1INCH_DEV_PORTAL_KEY}
+  chainId = 1                     # Ethereum mainnet
+  orderHash = sdk.createOrder(...).getOrderHash(1)
+
+# Returns: { status, fills[], settlement, makingAmount, takingAmount, ... }
+# status transitions: pending -> partially-filled -> filled, or expired, or refunded`}</pre>
+        <p className="text-[11px] text-cream-400 leading-snug">
+          The PoC wraps both endpoints in server-side Next.js routes (
+          <code className="inline-code">/api/status</code> and{' '}
+          <code className="inline-code">/api/fusion-status</code>) to keep the 1inch dev-portal
+          API key off the client bundle.
+        </p>
+      </div>
+
+      <div className="rounded-2xl border border-white/[0.05] bg-bg-700/40 p-5 mb-5">
+        <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-3">
           Market-hours nuance for tokenized equities
         </div>
         <p className="text-sm text-cream-300 leading-relaxed mb-3">
@@ -544,7 +613,7 @@ function AsyncPattern() {
         </p>
       </div>
 
-      <div className="rounded-2xl border border-white/[0.05] bg-bg-700/40 p-5">
+      <div className="rounded-2xl border border-white/[0.05] bg-bg-700/40 p-5 mb-5">
         <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-3">
           Failure modes &amp; refund semantics
         </div>
@@ -560,6 +629,25 @@ function AsyncPattern() {
           advantage. Atomic paths (Bebop, 1inch Aggregation) revert the entire deposit if the
           destination call fails &mdash; user gets USDC back on Optimism. The async path leaves
           USDC on Ethereum if the order expires. Both are safe; they fail in different states.
+        </p>
+      </div>
+
+      <div className="rounded-2xl border border-gold-500/15 bg-gold-500/[0.02] p-5">
+        <div className="text-[10px] uppercase tracking-widest gold-text font-semibold mb-3">
+          Future: single-signature Fusion via Pattern B
+        </div>
+        <p className="text-sm text-cream-300 leading-relaxed mb-3">
+          The PoC uses Pattern A (user is the Fusion order maker, two user signatures). There&rsquo;s
+          a Pattern B that collapses Fusion into a single signature: have the MulticallHandler
+          itself act as the Fusion maker, signing orders via ERC-1271 on-chain after Across
+          delivers USDC. The user signs only the Across deposit; the handler authorizes the
+          Fusion fill via contract signature.
+        </p>
+        <p className="text-sm text-cream-300 leading-relaxed">
+          Pattern B requires a custom MulticallHandler extension and resolver-side acceptance of
+          ERC-1271 signatures (supported by 1inch&rsquo;s settlement contract). Out of scope for
+          the PoC, but worth flagging so engineers reading this know single-sig Fusion is
+          architecturally reachable.
         </p>
       </div>
     </section>
