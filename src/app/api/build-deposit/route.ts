@@ -165,8 +165,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'across quote returned zero output' }, { status: 502 });
   }
 
-  // Across V4 deposit timestamps. The /swap/approval response may not surface these directly;
-  // we use current chain time + 6h fillDeadline which is the standard safe default.
+  // Across V4 deposit timestamps. fillDeadline is the latest time a relayer is
+  // allowed to fill the deposit before it can be refunded to fallbackRecipient.
+  // Across's /swap/approval typically returns ~2 hours by default; we use 6h
+  // here for a generous safety margin on the custom build-deposit path. Either
+  // value works; this is purely an integrator-side configuration.
   const now = Math.floor(Date.now() / 1000);
   const quoteTimestamp = now;
   const fillDeadline = now + 6 * 60 * 60; // 6 hours

@@ -119,7 +119,7 @@ function StatStrip() {
             <div className="text-4xl md:text-5xl font-bold tracking-tight tabular text-cream-50">
               {s.value}
             </div>
-            <div className="text-sm text-cream-400 mt-3 serif text-base">{s.label}</div>
+            <div className="text-cream-400 mt-3 serif text-base">{s.label}</div>
           </div>
         ))}
       </div>

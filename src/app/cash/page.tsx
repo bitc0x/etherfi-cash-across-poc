@@ -334,7 +334,7 @@ export default function CashDemo() {
             setPhase('error');
             setError(
               j.marketHoursIssue
-                ? 'Fusion resolvers offline - US markets closed. Try Bebop or 1inch Aggregation for 24/7 routing, or wait for market hours (Mon-Fri 9:30-16:00 EST).'
+                ? 'Fusion resolvers are offline while US markets are closed (Mon-Fri 9:30-16:00 EST). Use Bebop RFQ or 1inch Aggregation for atomic routing in the meantime, or wait for market hours.'
                 : friendlyError(String(j.error || `fusion quote failed (${r.status})`)),
             );
             return;
@@ -1352,7 +1352,7 @@ export default function CashDemo() {
                   <div className="text-[11px] text-cream-400 leading-snug">
                     1inch Fusion resolvers stop quoting Ondo GM tokens when US markets are closed
                     (Mon-Fri 9:30-16:00 EST). They can&apos;t hedge the underlying equity exposure
-                    off-hours. Use <button onClick={() => setLiquiditySource('bebop')} className="underline text-cream-200 hover:text-cream-100">Bebop RFQ</button> or <button onClick={() => setLiquiditySource('oneinch-aggregation')} className="underline text-cream-200 hover:text-cream-100">1inch Aggregation</button> for 24/7 routing.
+                    off-hours. Use <button onClick={() => setLiquiditySource('bebop')} className="underline text-cream-200 hover:text-cream-100">Bebop RFQ</button> or <button onClick={() => setLiquiditySource('oneinch-aggregation')} className="underline text-cream-200 hover:text-cream-100">1inch Aggregation</button> for atomic routing while markets are closed.
                   </div>
                 </div>
               </div>
@@ -1963,11 +1963,11 @@ function FilledState({
 function FlowExplainer({ asset, mode }: { asset: string; mode: Mode }) {
   const buySteps = [
     { i: '1', t: 'Cash safe debits', d: 'USDC leaves the OP safe via Across SpokePool. One user signature.' },
-    { i: '2', t: 'Relayer fills', d: 'Across relayer fronts USDC on Ethereum, settles in ~2 seconds.' },
+    { i: '2', t: 'Relayer fronts', d: 'Across relayer fronts the destination asset on Ethereum, settles in ~2 seconds.' },
     {
       i: '3',
-      t: 'Embedded action',
-      d: `MulticallHandler calls Bebop RFQ and delivers ${asset || 'the target asset'} atomically on Ethereum.`,
+      t: 'Atomic delivery',
+      d: `${asset || 'The target asset'} is delivered to the recipient on Ethereum in the same transaction. Single-step token-to-token route via the Across Swap API; no destination action contract needed.`,
     },
     {
       i: '✓',

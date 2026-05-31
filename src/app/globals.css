@@ -154,11 +154,11 @@ input[type=number] { -moz-appearance: textfield; }
   font-size: 0.78rem;
   line-height: 1.65;
   background: var(--bg-elev-2);
-  border: 1px solid var(--border-soft);
+  border: 1px solid var(--border);
   border-radius: 12px;
   padding: 1.25rem 1.5rem;
   overflow-x: auto;
-  color: var(--text-secondary);
+  color: var(--text-cream);
   white-space: pre;
   margin: 0;
 }

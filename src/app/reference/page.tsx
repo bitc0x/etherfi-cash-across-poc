@@ -662,7 +662,7 @@ function Hardening() {
     'Surface fees clearly. Across LP + relayer + destination gas. RFQ legs have zero slippage on the quoted amount; AMM legs have slippage tolerance you set.',
     'Show users the recipient address; offer choice between user wallet and Cash safe.',
     'Geo-restrict per asset jurisdiction policy where applicable (e.g. Ondo GM is APAC, Africa, LatAm currently).',
-    'Track deposits via Across /deposit/status for confirmation UX.',
+    'Track deposits via Across GET /api/deposit/status?originChainId=...&depositTxHash=... for confirmation UX. See section 07 for the exact endpoint shape.',
     'Handle the refund path if fillDeadline is reached without a fill. Rare but possible during extreme network conditions.',
   ];
   return (
