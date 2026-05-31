@@ -4,18 +4,18 @@ import Link from 'next/link';
 export const metadata = {
   title: 'Integration Reference · ether.fi × Across',
   description:
-    'How to wire Across\u2019s Swap API with embedded destination actions to access market-maker and DEX-aggregator liquidity from any supported origin chain.',
+    'How to wire Across\u2019s Swap API with embedded destination actions. Three sources wired in the PoC: Bebop RFQ, 1inch Aggregation, 1inch Fusion. Same pattern extends to any contract.',
   openGraph: {
     title: 'Integration Reference · ether.fi × Across',
     description:
-      'How to wire Across\u2019s Swap API for 1inch, 0x, Bebop, Paraswap, Odos, Kyberswap, Hashflow, or any custom router. One integration, N liquidity sources.',
+      'Sign once. Declare the outcome. Across does the rest. Three destination sources wired today: Bebop RFQ, 1inch Aggregation, 1inch Fusion.',
     images: ['/etherfi-logo.png'],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'Integration Reference · ether.fi × Across',
     description:
-      'One Across integration, N liquidity sources. 1inch, 0x, Bebop, Paraswap, Odos, Kyberswap, or custom routers.',
+      'Sign once. Declare the outcome. Across does the rest. Three destination sources wired today: Bebop RFQ, 1inch Aggregation, 1inch Fusion.',
     images: ['/etherfi-logo.png'],
   },
 };
@@ -74,12 +74,17 @@ function Header() {
       <h1 className="font-serif text-5xl md:text-6xl gold-text mb-6 tracking-tightest leading-[1.05]">
         How to wire Across&rsquo;s Swap API with embedded destination actions.
       </h1>
-      <p className="text-cream-300 max-w-3xl leading-relaxed text-lg">
+      <p className="text-cream-300 max-w-3xl leading-relaxed text-lg mb-5">
         A complete integration guide for routing USDC from a Cash safe on Optimism into any
-        Ethereum-side liquidity source through the Across Swap API. The destination action
-        framework is liquidity-source-agnostic: the same pattern wires into 1inch, 0x, Bebop
-        RFQ, Paraswap, Odos, Kyberswap, or a custom contract. We use Bebop in the examples
-        because it&rsquo;s what the mainnet PoC executed.
+        Ethereum-side liquidity source through the Across Swap API. The user signs once and
+        declares the minimum acceptable output; Across handles routing plus whatever destination
+        action completes the trade.
+      </p>
+      <p className="text-cream-300 max-w-3xl leading-relaxed text-lg">
+        Three sources wired in the live PoC today: <span className="text-cream-100">Bebop RFQ,
+        1inch Aggregation, 1inch Fusion</span>. Same pattern extends to 0x, Paraswap, Odos,
+        Kyberswap, Hashflow, or a custom router. ether.fi picks the source per trade without
+        ever touching the cross-chain layer.
       </p>
     </section>
   );

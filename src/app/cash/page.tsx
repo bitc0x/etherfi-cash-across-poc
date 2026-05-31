@@ -1668,13 +1668,15 @@ function DemoBanner() {
       <div className="text-sm leading-relaxed">
         <span className="font-semibold gold-text">Live PoC.</span>{' '}
         <span className="text-cream-200">
-          Opens with TSLAon (Ondo&rsquo;s tokenized Tesla). For TSLAon, NVDAon, GOOGLon,
-          COINon, HOODon, MSTRon, CRCLon the Buy button executes end-to-end on mainnet: the
-          Across Swap API delivers USDC to Ethereum and MulticallHandler atomically calls
-          Bebop&rsquo;s RFQ network to fill the order (~2s, zero slippage on the RFQ leg).
-          AAPLon, SPYon, QQQon render the architecture preview only (awaiting Bebop coverage).
-          USDY and the live yield assets below use the direct Across Swap API path with no
-          Bebop leg. Integration reference for ether.fi:{' '}
+          Opens with TSLAon (Ondo&rsquo;s tokenized Tesla). User signs once and declares min
+          output, Across delivers USDC to Ethereum, and the destination action completes the
+          trade. For TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, CRCLon a three-way{' '}
+          <span className="text-cream-50 font-semibold">destination liquidity toggle</span>{' '}
+          appears next to the trade form: Bebop RFQ (atomic, zero slippage), 1inch Aggregation
+          (atomic, multi-DEX, 24/7), or 1inch Fusion (Dutch auction, best rates during US
+          market hours). AAPLon, SPYon, QQQon render the architecture preview only (awaiting
+          Bebop coverage). USDY and the live yield assets below use the direct Across Swap
+          API path. Integration reference for ether.fi:{' '}
           <a href="/reference" className="gold-text hover:underline font-semibold">
             etherfi-cash-across-poc.vercel.app/reference
           </a>

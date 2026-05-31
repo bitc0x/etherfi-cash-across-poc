@@ -6,19 +6,19 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://etherfi-cash-across-poc.vercel.app'),
   title: 'ether.fi × Across · Ondo stocks in Cash, atomic',
   description:
-    'USDC on Optimism to TSLAon, NVDAon, GOOGLon and the wider Ondo GM family in one signature. Across + Bebop RFQ. Mainnet-proven.',
+    'USDC on Optimism to TSLAon, NVDAon, GOOGLon and the wider Ondo GM family in one signature. Three destination sources wired: Bebop RFQ, 1inch Aggregation, 1inch Fusion. Mainnet-proven.',
   icons: { icon: '/etherfi-logo.png' },
   openGraph: {
     title: 'ether.fi × Across · Ondo stocks in Cash',
     description:
-      'One signature, ~2 seconds, zero slippage on the RFQ leg. Mainnet-proven Path A live today.',
+      'Sign once. Declare the outcome. Across does the rest. Three destination liquidity sources wired in the PoC. Mainnet-proven.',
     images: ['/etherfi-logo.png'],
   },
   twitter: {
     card: 'summary_large_image',
     title: 'ether.fi × Across · Ondo stocks in Cash',
     description:
-      'One signature, ~2 seconds, zero slippage on the RFQ leg. Mainnet-proven Path A live today.',
+      'Sign once. Declare the outcome. Across does the rest. Three destination liquidity sources wired in the PoC. Mainnet-proven.',
     images: ['/etherfi-logo.png'],
   },
 };
