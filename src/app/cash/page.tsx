@@ -4,7 +4,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { useAccount, useBalance, useChainId, useReadContract, useSendTransaction, useSwitchChain } from 'wagmi';
+import { useAccount, useBalance, useChainId, useReadContract, useSendTransaction, useSignTypedData, useSwitchChain } from 'wagmi';
 import type { AcrossChain, AcrossToken } from '@/lib/tokens';
 import { DEMO_DEST_SYMBOLS, isBebopBuyable, isStock, LOCAL_LOGO_OVERRIDES, ORIGIN_USDC, RELIABLE_LOGOS, STOCK_MOCK_PRICE } from '@/lib/tokens';
 import { formatUnits, friendlyError, parseUnits } from '@/lib/format';
@@ -62,7 +62,41 @@ type StockQuote = {
   };
 };
 
-type LiquiditySource = 'bebop' | 'oneinch-aggregation';
+type LiquiditySource = 'bebop' | 'oneinch-aggregation' | 'oneinch-fusion';
+
+// Response shape from /api/fusion-quote
+type FusionQuote = {
+  quoteId: string;
+  recommendedPreset?: string;
+  presets?: {
+    fast?: { auctionStartAmount?: string; auctionEndAmount?: string; auctionDuration?: number };
+    medium?: { auctionStartAmount?: string; auctionEndAmount?: string; auctionDuration?: number };
+    slow?: { auctionStartAmount?: string; auctionEndAmount?: string; auctionDuration?: number };
+  };
+  prices?: { usd?: { fromToken?: string; toToken?: string } };
+  fee?: { bps?: number };
+  marketHoursIssue?: boolean;
+  error?: string;
+};
+
+// Response shape from /api/fusion-build-order
+type FusionBuiltOrder = {
+  typedData: {
+    primaryType: string;
+    domain: { name: string; version: string; chainId: number; verifyingContract: string };
+    types: Record<string, unknown>;
+    message: Record<string, unknown>;
+  };
+  orderHash: string;
+  quoteId: string;
+  order: {
+    salt: string; maker: string; receiver: string; makerAsset: string; takerAsset: string;
+    makingAmount: string; takingAmount: string; makerTraits: string;
+  };
+  extension: string;
+  auction?: { startTime?: string; endTime?: string; deadline?: string };
+  amounts?: { makingAmount: string; takingAmount: string };
+};
 
 type Phase =
   | 'idle'
@@ -72,6 +106,15 @@ type Phase =
   | 'signing'
   | 'filling'
   | 'filled'
+  // Fusion-specific phases (async, two-signature flow)
+  | 'fusion-approving-usdc'   // Pre-flight USDC -> Aggregation Router allowance
+  | 'fusion-bridging'         // Across deposit in flight, USDC moving to user wallet on Ethereum
+  | 'fusion-bridged'          // USDC arrived, ready to submit Fusion order
+  | 'fusion-signing-order'    // Prompting EIP-712 signature for the limit order
+  | 'fusion-submitting'       // POSTing signed order to 1inch relayer
+  | 'fusion-auction'          // Order in Dutch auction, resolvers competing
+  | 'fusion-filled'           // Resolver filled the order, output token delivered
+  | 'fusion-expired'          // Auction window closed without fill; USDC stays in user wallet
   | 'error';
 
 type Mode = 'buy' | 'sell';
@@ -124,6 +167,15 @@ export default function CashDemo() {
   const [originTxHash, setOriginTxHash] = useState<string | null>(null);
   const [fillTxHash, setFillTxHash] = useState<string | null>(null);
   const [liquiditySource, setLiquiditySource] = useState<LiquiditySource>('bebop');
+  // Fusion-specific state (only populated when liquiditySource === 'oneinch-fusion')
+  const [fusionQuote, setFusionQuote] = useState<FusionQuote | null>(null);
+  const [fusionStatus, setFusionStatus] = useState<{
+    status?: string;
+    fills?: Array<{ amount?: string; txHash?: string }>;
+    [k: string]: unknown;
+  } | null>(null);
+  const [fusionOrderHash, setFusionOrderHash] = useState<string | null>(null);
+  const { signTypedDataAsync } = useSignTypedData();
 
   // Fetch chains + Ethereum tokens once
   useEffect(() => {
@@ -237,16 +289,76 @@ export default function CashDemo() {
     setFillTxHash(null);
   }, [mode]);
 
-  // Fetch quote on input change. Three branches:
-  //   1. Bebop-buyable Ondo GM stock in Buy mode -> POST /api/build-deposit
-  //      (Across + Bebop RFQ + MulticallHandler atomic path).
-  //   2. Preview-only stock (AAPLon, SPYon, QQQon) -> show architecture preview,
-  //      no live quote.
-  //   3. Live asset (USDY, sUSDe, etc.) -> GET /api/swap (Across Swap API).
+  // Fetch quote on input change. Four branches now:
+  //   1a. Bebop / 1inch Aggregation source -> POST /api/build-deposit
+  //       (Across + atomic destination action via MulticallHandler).
+  //   1b. 1inch Fusion source -> GET /api/fusion-quote
+  //       (Across delivers USDC to user wallet, then user signs and submits a
+  //       Fusion order separately - async two-signature flow).
+  //   2.  Preview-only stock (AAPLon, SPYon, QQQon) -> architecture preview,
+  //       no live quote.
+  //   3.  Live asset (USDY, sUSDe, etc.) -> GET /api/swap (Across Swap API).
   useEffect(() => {
-    // Branch 1: Bebop path for buyable stocks (Buy direction only; Sell uses Swap API).
+    // Branch 1b: Fusion preview (different architecture from Bebop/Aggregation).
+    if (isStockSelected && isBebopSelected && mode === 'buy' && liquiditySource === 'oneinch-fusion') {
+      setQuote(null);
+      setStockQuote(null);
+      if (!address || !amount || Number(amount) <= 0 || !selectedAsset?.token) {
+        setFusionQuote(null);
+        setPhase('idle');
+        return;
+      }
+      const ctrl = new AbortController();
+      const t = setTimeout(async () => {
+        setPhase('quoting');
+        setError(null);
+        try {
+          const raw = parseUnits(amount, ORIGIN_USDC.decimals);
+          const url = new URL('/api/fusion-quote', window.location.origin);
+          // Fusion is destination-only here (USDC on Ethereum -> stock on Ethereum).
+          // The Across bridge leg happens separately on the Buy click.
+          url.searchParams.set('fromTokenAddress', '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48');
+          url.searchParams.set('toTokenAddress', selectedAsset.token!.address);
+          // Approximate the post-Across-fee USDC amount that will arrive on Ethereum.
+          // Across charges ~25-30bps on USDC OP -> USDC ETH; we use 99.7% as a safe
+          // estimate for the quote preview. The actual Fusion order built on Buy
+          // click uses the precise post-bridge USDC amount.
+          const estUsdcEth = (raw * 997n) / 1000n;
+          url.searchParams.set('amount', estUsdcEth.toString());
+          url.searchParams.set('walletAddress', address);
+          const r = await fetch(url.toString(), { signal: ctrl.signal });
+          const j = await r.json();
+          if (!r.ok || j.error) {
+            // Off-hours / no-coverage case: surface marketHoursIssue cleanly
+            setFusionQuote({ ...j, marketHoursIssue: j.marketHoursIssue });
+            setPhase('error');
+            setError(
+              j.marketHoursIssue
+                ? 'Fusion resolvers offline - US markets closed. Try Bebop or 1inch Aggregation for 24/7 routing, or wait for market hours (Mon-Fri 9:30-16:00 EST).'
+                : friendlyError(String(j.error || `fusion quote failed (${r.status})`)),
+            );
+            return;
+          }
+          setFusionQuote(j);
+          setPhase('quoted');
+        } catch (e: unknown) {
+          const err = e as { name?: string; message?: string };
+          if (err?.name === 'AbortError') return;
+          setError(friendlyError(String(err?.message || e)));
+          setPhase('error');
+          setFusionQuote(null);
+        }
+      }, 400);
+      return () => {
+        clearTimeout(t);
+        ctrl.abort();
+      };
+    }
+
+    // Branch 1a: Bebop or 1inch Aggregation (atomic via MulticallHandler).
     if (isStockSelected && isBebopSelected && mode === 'buy') {
       setQuote(null);
+      setFusionQuote(null);
       if (!address || !amount || Number(amount) <= 0 || !selectedAsset?.token) {
         setStockQuote(null);
         setPhase('idle');
@@ -404,9 +516,250 @@ export default function CashDemo() {
     }
   }, [stockQuote, spokeAllowance]);
 
+  // Fusion path needs TWO separate allowances:
+  //  (a) USDC OP -> SpokePool on Optimism (so Across can pull USDC for the bridge leg).
+  //      The SpokePool address is the same regardless of liquidity source; we use
+  //      the well-known constant rather than relying on stockQuote which is null
+  //      on the Fusion path.
+  //  (b) USDC ETH -> 1inch Aggregation Router v6 on Ethereum (so the Fusion
+  //      resolver can pull USDC for the swap fill).
+  // USDC native on Ethereum does NOT support EIP-2612 permit, so (b) must be a
+  // separate approve() tx. One-time per user.
+  const SPOKE_POOL_OP = '0x6f26Bf09B1C792e3228e5467807a900A503c0281' as const;
+  const ONEINCH_ROUTER_V6_ETH = '0x111111125421cA6dc452d289314280a0f8842A65' as const;
+  const USDC_ETH_ADDR = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as const;
+
+  const isFusionSelected =
+    isStockSelected && isBebopSelected && mode === 'buy' && liquiditySource === 'oneinch-fusion';
+
+  const ERC20_ALLOWANCE_ABI = [
+    {
+      type: 'function',
+      name: 'allowance',
+      stateMutability: 'view',
+      inputs: [
+        { name: 'owner', type: 'address' },
+        { name: 'spender', type: 'address' },
+      ],
+      outputs: [{ type: 'uint256' }],
+    },
+  ] as const;
+
+  const { data: fusionOpSpokeAllowance } = useReadContract({
+    address: ORIGIN_USDC.address as `0x${string}`,
+    abi: ERC20_ALLOWANCE_ABI,
+    functionName: 'allowance',
+    args: address ? [address as `0x${string}`, SPOKE_POOL_OP] : undefined,
+    chainId: 10,
+    query: { enabled: !!address && isFusionSelected, refetchInterval: 8000 },
+  });
+
+  const { data: fusionEthRouterAllowance } = useReadContract({
+    address: USDC_ETH_ADDR,
+    abi: ERC20_ALLOWANCE_ABI,
+    functionName: 'allowance',
+    args: address ? [address as `0x${string}`, ONEINCH_ROUTER_V6_ETH] : undefined,
+    chainId: 1,
+    query: { enabled: !!address && isFusionSelected, refetchInterval: 8000 },
+  });
+
   async function execute() {
     if (!address || !selectedAsset?.token) return;
     setError(null);
+
+    // ==============================================================
+    // BRANCH F: 1inch Fusion async path (two signatures, Dutch auction)
+    //
+    // Flow:
+    //   1. (optional) Approve USDC ETH -> 1inch Aggregation Router (one-time per user)
+    //   2. (optional) Approve USDC OP  -> Across SpokePool         (one-time per user)
+    //   3. Sign + send Across depositV3 on Optimism, recipient = user wallet on
+    //      Ethereum, NO embedded action. Across just bridges USDC.
+    //   4. Poll Across /deposit/status until USDC arrives on user's Ethereum wallet (~2-4s)
+    //   5. Build the Fusion order via SDK, get EIP-712 typedData
+    //   6. User signs typedData (off-chain, no gas)
+    //   7. POST signed order to 1inch relayer
+    //   8. Poll Fusion order status until filled or expired
+    // ==============================================================
+    if (
+      liquiditySource === 'oneinch-fusion' &&
+      isStockSelected && isBebopSelected && mode === 'buy' &&
+      fusionQuote && !fusionQuote.marketHoursIssue
+    ) {
+      try {
+        const raw = parseUnits(amount, ORIGIN_USDC.decimals);
+        const opChain = 10;
+        const ethChain = 1;
+
+        // Estimate the post-bridge USDC amount (Across charges ~25-30bps on
+        // USDC OP -> USDC ETH). We need at least this much approved on the
+        // Ethereum router. The actual /api/swap response gives us the precise
+        // figure; this estimate is just for the allowance pre-flight check.
+        const estUsdcEth = (raw * 997n) / 1000n;
+
+        // --------- Step 1: USDC ETH -> 1inch Router approval (one-time) ---------
+        if (
+          fusionEthRouterAllowance === undefined ||
+          (fusionEthRouterAllowance as bigint) < estUsdcEth
+        ) {
+          if (chainId !== ethChain) await switchChain({ chainId: ethChain });
+          setPhase('fusion-approving-usdc');
+          const max = (1n << 256n) - 1n;
+          const spenderPadded = ONEINCH_ROUTER_V6_ETH.slice(2).padStart(64, '0');
+          const amtPadded = max.toString(16).padStart(64, '0');
+          const approveCalldata = `0x095ea7b3${spenderPadded}${amtPadded}` as `0x${string}`;
+          await sendTransactionAsync({
+            to: USDC_ETH_ADDR,
+            data: approveCalldata,
+          });
+        }
+
+        // --------- Step 2: USDC OP -> SpokePool approval (one-time) ---------
+        if (
+          fusionOpSpokeAllowance === undefined ||
+          (fusionOpSpokeAllowance as bigint) < raw
+        ) {
+          if (chainId !== opChain) await switchChain({ chainId: opChain });
+          setPhase('approving');
+          const max = (1n << 256n) - 1n;
+          const spenderPadded = SPOKE_POOL_OP.slice(2).padStart(64, '0');
+          const amtPadded = max.toString(16).padStart(64, '0');
+          const approveCalldata = `0x095ea7b3${spenderPadded}${amtPadded}` as `0x${string}`;
+          await sendTransactionAsync({
+            to: ORIGIN_USDC.address as `0x${string}`,
+            data: approveCalldata,
+          });
+        }
+
+        // --------- Step 3: Build + send Across deposit (vanilla, no actions) ---------
+        if (chainId !== opChain) await switchChain({ chainId: opChain });
+        const swapUrl = new URL('/api/swap', window.location.origin);
+        swapUrl.searchParams.set('inputToken', ORIGIN_USDC.address);
+        swapUrl.searchParams.set('outputToken', USDC_ETH_ADDR);
+        swapUrl.searchParams.set('originChainId', String(opChain));
+        swapUrl.searchParams.set('destinationChainId', String(ethChain));
+        swapUrl.searchParams.set('amount', raw.toString());
+        swapUrl.searchParams.set('depositor', address);
+        swapUrl.searchParams.set('recipient', address);
+        const swapResp = await fetch(swapUrl.toString()).then((r) => r.json());
+        if (swapResp.error || !swapResp.swapTx) {
+          throw new Error(swapResp.error || 'across /swap returned no tx');
+        }
+        setPhase('fusion-bridging');
+        const depositTxHash = await sendTransactionAsync({
+          to: swapResp.swapTx.to as `0x${string}`,
+          data: swapResp.swapTx.data as `0x${string}`,
+          value: BigInt(swapResp.swapTx.value || '0'),
+        });
+        setOriginTxHash(depositTxHash);
+
+        // --------- Step 4: Wait for Across delivery ---------
+        const startBridge = Date.now();
+        let arrived = false;
+        while (Date.now() - startBridge < 120_000) {
+          await new Promise((r) => setTimeout(r, 2500));
+          try {
+            const r = await fetch(
+              `/api/status?originChainId=${opChain}&depositTxHash=${depositTxHash}`,
+              { cache: 'no-store' },
+            );
+            if (r.ok) {
+              const j = await r.json();
+              if (j?.status === 'filled' || j?.fillTx) {
+                setFillTxHash(j.fillTx || j.fillTxHash || null);
+                arrived = true;
+                break;
+              }
+            }
+          } catch {}
+        }
+        if (!arrived) throw new Error('Across delivery timed out after 2 minutes');
+        setPhase('fusion-bridged');
+
+        // --------- Step 5: Build Fusion order with the precise post-bridge amount ---------
+        const arrivedAmount = swapResp.expectedOutputAmount;
+        const buildResp = await fetch('/api/fusion-build-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fromTokenAddress: USDC_ETH_ADDR,
+            toTokenAddress: selectedAsset.token!.address,
+            amount: arrivedAmount,
+            walletAddress: address,
+            preset: 'fast',
+            source: 'etherfi-cash-across-poc',
+          }),
+        }).then((r) => r.json());
+        if (buildResp.error || !buildResp.typedData) {
+          throw new Error(buildResp.error || 'fusion order build failed');
+        }
+
+        // --------- Step 6: User signs the EIP-712 order ---------
+        if (chainId !== ethChain) await switchChain({ chainId: ethChain });
+        setPhase('fusion-signing-order');
+        // Strip EIP712Domain from types - wagmi/viem add it internally and
+        // including it explicitly causes a duplicate-type error in some wallets.
+        const signTypes = { ...(buildResp.typedData.types as Record<string, unknown>) };
+        delete (signTypes as Record<string, unknown>).EIP712Domain;
+        const signature = await signTypedDataAsync({
+          domain: {
+            name: buildResp.typedData.domain.name,
+            version: buildResp.typedData.domain.version,
+            chainId: buildResp.typedData.domain.chainId,
+            verifyingContract: buildResp.typedData.domain.verifyingContract as `0x${string}`,
+          },
+          types: signTypes as Record<string, Array<{ name: string; type: string }>>,
+          primaryType: buildResp.typedData.primaryType as 'Order',
+          message: buildResp.typedData.message as Record<string, unknown>,
+        });
+
+        // --------- Step 7: Submit signed order to 1inch relayer ---------
+        setPhase('fusion-submitting');
+        const submitResp = await fetch('/api/fusion-submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            order: buildResp.order,
+            signature,
+            extension: buildResp.extension,
+            quoteId: buildResp.quoteId,
+            orderHash: buildResp.orderHash,
+          }),
+        }).then((r) => r.json());
+        if (submitResp.error) throw new Error(submitResp.error);
+        setFusionOrderHash(buildResp.orderHash);
+
+        // --------- Step 8: Poll Fusion order status ---------
+        setPhase('fusion-auction');
+        const startAuction = Date.now();
+        const pollFusion = async () => {
+          try {
+            const r = await fetch(
+              `/api/fusion-status?orderHash=${buildResp.orderHash}`,
+              { cache: 'no-store' },
+            );
+            const j = await r.json();
+            setFusionStatus(j);
+            if (j?.status === 'filled') {
+              setPhase('fusion-filled');
+              return;
+            }
+            if (j?.status === 'expired' || j?.status === 'cancelled') {
+              setPhase('fusion-expired');
+              return;
+            }
+          } catch {}
+          // Max ~6 minutes of polling (Dutch auction max is typically 3min)
+          if (Date.now() - startAuction < 360_000) setTimeout(pollFusion, 3000);
+        };
+        setTimeout(pollFusion, 2000);
+        return;
+      } catch (e: any) {
+        setError(friendlyError(String(e?.shortMessage || e?.message || e)));
+        setPhase('error');
+        return;
+      }
+    }
 
     // ==============================================================
     // BRANCH A: Bebop path (Buy of an Ondo GM stock with Bebop coverage).
@@ -627,9 +980,10 @@ export default function CashDemo() {
 
             <div className="space-y-2">
               {/* Liquidity source toggle: only relevant for Bebop-buyable Ondo GM
-                  stocks in Buy mode, where the destination action sources liquidity
-                  from either Bebop RFQ or 1inch Aggregation. Other paths (yield assets,
-                  Sell mode, preview-only stocks) don't expose a source choice. */}
+                  stocks in Buy mode. Three options:
+                  - Bebop RFQ: atomic via MulticallHandler, zero slippage
+                  - 1inch Aggregation: atomic via MulticallHandler, multi-DEX route
+                  - 1inch Fusion: async limit order, Dutch auction, market-hours dependent */}
               {isStockSelected && isBebopSelected && mode === 'buy' && (
                 <div className="card-inner p-3.5 flex items-center justify-between gap-3 flex-wrap">
                   <div className="min-w-0">
@@ -637,10 +991,19 @@ export default function CashDemo() {
                       Destination liquidity
                     </div>
                     <div className="text-[11px] text-cream-400 leading-tight">
-                      Across delivers USDC to MulticallHandler; this is what executes the swap on Ethereum.
+                      {liquiditySource === 'oneinch-fusion' ? (
+                        <>
+                          Async pattern: Across delivers USDC to your Ethereum wallet, then you sign a Fusion order
+                          for resolvers to fill via Dutch auction. Two signatures.
+                        </>
+                      ) : (
+                        <>
+                          Across delivers USDC to MulticallHandler; this is what executes the swap atomically on Ethereum.
+                        </>
+                      )}
                     </div>
                   </div>
-                  <div className="flex items-center bg-bg-700 rounded-full p-0.5 border border-white/[0.05] flex-shrink-0">
+                  <div className="flex items-center bg-bg-700 rounded-full p-0.5 border border-white/[0.05] flex-shrink-0 flex-wrap gap-y-0.5">
                     <button
                       type="button"
                       onClick={() => setLiquiditySource('bebop')}
@@ -664,6 +1027,18 @@ export default function CashDemo() {
                       }
                     >
                       1inch Aggregation
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLiquiditySource('oneinch-fusion')}
+                      className={
+                        'px-3 py-1.5 rounded-full text-[11px] font-semibold tracking-tight transition-colors ' +
+                        (liquiditySource === 'oneinch-fusion'
+                          ? 'bg-gold-500 text-[#1A140A]'
+                          : 'text-cream-300 hover:text-cream-100')
+                      }
+                    >
+                      1inch Fusion
                     </button>
                   </div>
                 </div>
@@ -757,6 +1132,25 @@ export default function CashDemo() {
                   <input
                     readOnly
                     value={(() => {
+                      // Fusion path: show midpoint of the Dutch auction range as the preview.
+                      // Fusion has min/max amounts (auctionStartAmount, auctionEndAmount); the
+                      // actual fill amount falls between them depending on when the resolver fills.
+                      if (
+                        isStockSelected && isBebopSelected && mode === 'buy' &&
+                        liquiditySource === 'oneinch-fusion' && fusionQuote?.presets
+                      ) {
+                        const preset = fusionQuote.recommendedPreset && fusionQuote.presets[fusionQuote.recommendedPreset as 'fast' | 'medium' | 'slow'];
+                        const fast = fusionQuote.presets.fast;
+                        const chosen = preset || fast;
+                        if (chosen?.auctionStartAmount && chosen?.auctionEndAmount) {
+                          // Output token decimals: Ondo GM = 18, others read separately
+                          const decimals = 18;
+                          const start = BigInt(chosen.auctionStartAmount);
+                          const end = BigInt(chosen.auctionEndAmount);
+                          const mid = (start + end) / 2n;
+                          return (Number(mid) / 10 ** decimals).toFixed(6);
+                        }
+                      }
                       // Bebop-buyable stock (Buy mode): show live destination-leg output amount,
                       // regardless of whether the source is Bebop or 1inch Aggregation.
                       if (isStockSelected && isBebopSelected && mode === 'buy' && stockQuote?.destination) {
@@ -910,6 +1304,57 @@ export default function CashDemo() {
               </div>
             )}
 
+            {/* Fusion destination route preview - only when on the Fusion path,
+                shows the Dutch auction range and labels the async pattern. */}
+            {liquiditySource === 'oneinch-fusion' && fusionQuote?.presets && !fusionQuote.marketHoursIssue && (
+              <div className="mt-3 rounded-xl border border-white/[0.05] bg-bg-700/40 px-3.5 py-2.5 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-0.5">
+                    Destination route
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs tabular text-cream-200">
+                      1inch Fusion on Ethereum
+                    </span>
+                    {(() => {
+                      const preset = fusionQuote.recommendedPreset && fusionQuote.presets?.[fusionQuote.recommendedPreset as 'fast' | 'medium' | 'slow'];
+                      const chosen = preset || fusionQuote.presets?.fast;
+                      if (!chosen?.auctionStartAmount || !chosen?.auctionEndAmount) return null;
+                      const decimals = 18;
+                      const start = Number(BigInt(chosen.auctionStartAmount)) / 10 ** decimals;
+                      const end = Number(BigInt(chosen.auctionEndAmount)) / 10 ** decimals;
+                      return (
+                        <span className="text-[10px] text-cream-500">
+                          ({end.toFixed(6)} to {start.toFixed(6)} {selectedAsset?.symbol}, ~{chosen.auctionDuration}s auction)
+                        </span>
+                      );
+                    })()}
+                  </div>
+                </div>
+                <span className="px-2 py-0.5 rounded-full bg-purple-400/15 border border-purple-400/30 text-purple-200 font-semibold text-[10px] tracking-wider flex-shrink-0">
+                  DUTCH AUCTION
+                </span>
+              </div>
+            )}
+
+            {/* Fusion market-hours notice - shows when resolvers are offline.
+                Honest framing: explain why and what to do instead. */}
+            {liquiditySource === 'oneinch-fusion' && fusionQuote?.marketHoursIssue && (
+              <div className="mt-3 rounded-xl border border-amber-400/25 bg-amber-400/[0.06] px-3.5 py-2.5 flex items-start gap-2.5">
+                <div className="text-amber-300 text-sm leading-none mt-0.5">!</div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-semibold text-amber-200 mb-0.5">
+                    Fusion resolvers are offline
+                  </div>
+                  <div className="text-[11px] text-cream-400 leading-snug">
+                    1inch Fusion resolvers stop quoting Ondo GM tokens when US markets are closed
+                    (Mon-Fri 9:30-16:00 EST). They can&apos;t hedge the underlying equity exposure
+                    off-hours. Use <button onClick={() => setLiquiditySource('bebop')} className="underline text-cream-200 hover:text-cream-100">Bebop RFQ</button> or <button onClick={() => setLiquiditySource('oneinch-aggregation')} className="underline text-cream-200 hover:text-cream-100">1inch Aggregation</button> for 24/7 routing.
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Recipient disclosure - honest about where funds land in this PoC */}
             {isConnected && address && (
               <div className="mt-3 rounded-xl border border-white/[0.05] bg-bg-700/40 px-3.5 py-2.5 flex items-start justify-between gap-3">
@@ -940,7 +1385,7 @@ export default function CashDemo() {
                     </button>
                   )}
                 </ConnectButton.Custom>
-              ) : phase === 'filled' ? (
+              ) : phase === 'filled' || phase === 'fusion-filled' ? (
                 <FilledState
                   asset={selectedAsset?.symbol || ''}
                   mode={mode}
@@ -951,11 +1396,18 @@ export default function CashDemo() {
                 <button
                   onClick={execute}
                   disabled={
-                    (!quote && !stockQuote) ||
+                    (!quote && !stockQuote && !fusionQuote) ||
+                    (liquiditySource === 'oneinch-fusion' && fusionQuote?.marketHoursIssue) ||
                     phase === 'quoting' ||
                     phase === 'signing' ||
                     phase === 'filling' ||
-                    phase === 'approving'
+                    phase === 'approving' ||
+                    phase === 'fusion-approving-usdc' ||
+                    phase === 'fusion-bridging' ||
+                    phase === 'fusion-bridged' ||
+                    phase === 'fusion-signing-order' ||
+                    phase === 'fusion-submitting' ||
+                    phase === 'fusion-auction'
                   }
                   className="btn-gold w-full"
                 >
@@ -965,11 +1417,20 @@ export default function CashDemo() {
                   {phase === 'signing' && 'Confirm in wallet...'}
                   {phase === 'filling' &&
                     (mode === 'buy' ? 'Filling on Ethereum...' : 'Filling on Optimism...')}
+                  {/* Fusion-specific phase labels */}
+                  {phase === 'fusion-approving-usdc' && 'Approving USDC for 1inch Router...'}
+                  {phase === 'fusion-bridging' && 'Bridging USDC via Across...'}
+                  {phase === 'fusion-bridged' && 'USDC arrived. Preparing Fusion order...'}
+                  {phase === 'fusion-signing-order' && 'Sign Fusion order in wallet...'}
+                  {phase === 'fusion-submitting' && 'Submitting to 1inch relayer...'}
+                  {phase === 'fusion-auction' && `Resolver competing on Dutch auction...`}
                   {(phase === 'idle' || phase === 'quoted' || phase === 'error') &&
                     (mode === 'buy'
-                      ? (stockQuote ? needsStockApproval : needsApproval)
-                        ? `Approve & buy ${selectedAsset?.symbol || ''}`
-                        : `Buy ${selectedAsset?.symbol || ''}`
+                      ? liquiditySource === 'oneinch-fusion' && fusionQuote && !fusionQuote.marketHoursIssue
+                        ? `Bridge + buy ${selectedAsset?.symbol || ''} via Fusion`
+                        : (stockQuote ? needsStockApproval : needsApproval)
+                          ? `Approve & buy ${selectedAsset?.symbol || ''}`
+                          : `Buy ${selectedAsset?.symbol || ''}`
                       : needsApproval
                         ? `Approve & sell ${selectedAsset?.symbol || ''}`
                         : `Sell ${selectedAsset?.symbol || ''}`)}
