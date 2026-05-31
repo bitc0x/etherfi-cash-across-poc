@@ -31,6 +31,7 @@ export default function ReferencePage() {
       <Invariants />
       <Atomic />
       <AnyLiquiditySource />
+      <AsyncPattern />
       <Hardening />
       <FooterCTA />
       <Footer />
@@ -357,16 +358,20 @@ function Atomic() {
 function AnyLiquiditySource() {
   const sources: { name: string; note: string }[] = [
     {
-      name: '1inch',
-      note: 'Their swap endpoint returns calldata for the aggregated route, including Fusion RFQ orders where MMs sit alongside AMMs.',
+      name: '1inch Aggregation',
+      note: 'Multi-DEX routing across AMMs and PMMs (Bebop, Hashflow, etc). Atomic via the Aggregation Router v6 on Ethereum. Routes Ondo GM tokens 24/7 (currently via Bebop as one of its PMM sources). Wired in the PoC.',
+    },
+    {
+      name: '1inch Fusion',
+      note: 'Intent-based limit orders filled by resolvers via Dutch auction. Async pattern: Across delivers USDC to user wallet, user signs an EIP-712 order, resolver fills within auction window. Routes Ondo GM tokens during US market hours (Mon-Fri 9:30-16:00 EST) via the Ondo x 1inch partnership. Wired in the PoC.',
+    },
+    {
+      name: 'Bebop RFQ',
+      note: 'The PoC reference implementation. Strongest fit for tokenized equities like Ondo GM because MMs are Ondo-approved primary holders, so they quote 24/7 regardless of TradFi market hours. Wired in the PoC.',
     },
     {
       name: '0x / Matcha',
       note: 'The Swap API returns ABI-decodable calldata for RFQ-T orders alongside on-chain liquidity.',
-    },
-    {
-      name: 'Bebop RFQ',
-      note: 'The PoC reference implementation. Strongest fit for tokenized equities like Ondo GM because MMs are Ondo-approved holders.',
     },
     {
       name: 'Paraswap',
@@ -408,6 +413,109 @@ function AnyLiquiditySource() {
   );
 }
 
+function AsyncPattern() {
+  return (
+    <section className="max-w-5xl mx-auto px-6 py-10">
+      <div className="eyebrow mb-3">07 &middot; Async pattern</div>
+      <h2 className="font-serif text-3xl md:text-4xl gold-text mb-5 tracking-tightest">
+        When the liquidity source is intent-based.
+      </h2>
+      <p className="text-cream-300 leading-relaxed mb-5">
+        Most destination liquidity sources (Bebop, 1inch Aggregation, 0x, Paraswap) are atomic:
+        the swap calldata sits inside a MulticallHandler action and executes in the same tx as
+        the Across fill. One user signature, ~2 seconds, done.
+      </p>
+      <p className="text-cream-300 leading-relaxed mb-5">
+        Intent-based sources like 1inch Fusion work differently. The user signs an EIP-712 limit
+        order off-chain and resolvers compete to fill it via Dutch auction. Across&rsquo;s role
+        changes from &ldquo;atomic executor&rdquo; to &ldquo;reliable USDC delivery to the user
+        wallet on the destination chain.&rdquo; The signed order can then be submitted to the
+        relayer once USDC has arrived.
+      </p>
+
+      <div className="rounded-2xl border border-white/[0.05] bg-bg-700/40 p-5 mb-5">
+        <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-3">
+          Two-signature flow (Fusion path)
+        </div>
+        <ol className="space-y-2.5 text-sm text-cream-200">
+          <li className="flex gap-3">
+            <span className="text-gold-300 font-mono tabular flex-shrink-0">1</span>
+            <span>
+              <span className="text-cream-100 font-semibold">Pre-flight allowances.</span> User
+              approves USDC OP &rarr; SpokePool (for the Across deposit) and USDC ETH &rarr;
+              1inch Aggregation Router v6 (for the Fusion fill). One-time per user. USDC native
+              on Ethereum doesn&rsquo;t support EIP-2612 permit so this can&rsquo;t be batched
+              into a signature.
+            </span>
+          </li>
+          <li className="flex gap-3">
+            <span className="text-gold-300 font-mono tabular flex-shrink-0">2</span>
+            <span>
+              <span className="text-cream-100 font-semibold">Across deposit.</span> recipient =
+              user&rsquo;s Ethereum wallet, no embedded action. Plain USDC bridge, ~2&ndash;4
+              seconds.
+            </span>
+          </li>
+          <li className="flex gap-3">
+            <span className="text-gold-300 font-mono tabular flex-shrink-0">3</span>
+            <span>
+              <span className="text-cream-100 font-semibold">Build the Fusion order.</span> Once
+              USDC arrives, fetch a Fusion quote and build the order with the precise
+              post-bridge amount. SDK returns ready-to-sign EIP-712 typed data plus extension
+              bytes (auction parameters, whitelist of resolvers, fee config).
+            </span>
+          </li>
+          <li className="flex gap-3">
+            <span className="text-gold-300 font-mono tabular flex-shrink-0">4</span>
+            <span>
+              <span className="text-cream-100 font-semibold">User signs.</span> Off-chain
+              EIP-712 signature via the wallet. No gas. The signed order is submitted to
+              1inch&rsquo;s relayer.
+            </span>
+          </li>
+          <li className="flex gap-3">
+            <span className="text-gold-300 font-mono tabular flex-shrink-0">5</span>
+            <span>
+              <span className="text-cream-100 font-semibold">Dutch auction.</span> Resolvers
+              compete to fill the order. Typical fill: 30s&ndash;3min during liquid market
+              conditions. Output token lands in the user&rsquo;s wallet.
+            </span>
+          </li>
+        </ol>
+      </div>
+
+      <div className="rounded-2xl border border-white/[0.05] bg-bg-700/40 p-5 mb-5">
+        <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-3">
+          Market-hours nuance for tokenized equities
+        </div>
+        <p className="text-sm text-cream-300 leading-relaxed mb-3">
+          Fusion resolvers for Ondo GM tokens only quote during US market hours (Mon&ndash;Fri
+          9:30&ndash;16:00 EST). Outside that window the quoter returns a 500 because resolvers
+          can&rsquo;t hedge their equity exposure when TradFi brokerages are closed.
+        </p>
+        <p className="text-sm text-cream-300 leading-relaxed">
+          The PoC detects this and surfaces a clean fallback: switch to Bebop RFQ (Ondo-approved
+          MMs quote 24/7 because they&rsquo;re primary holders, not directional traders) or
+          1inch Aggregation (routes through Bebop as one of its PMM sources). Same Across rails,
+          different tool per market state.
+        </p>
+      </div>
+
+      <div className="rounded-2xl border border-white/[0.05] bg-bg-700/40 p-5">
+        <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-3">
+          Refund semantics
+        </div>
+        <p className="text-sm text-cream-300 leading-relaxed">
+          If the Fusion order expires unfilled (no resolver competed within the auction
+          window), the bridged USDC stays in the user&rsquo;s Ethereum wallet. No funds lost.
+          The user can retry with another route or wait for better market conditions. This is
+          the trade-off for potentially better fill rates via Dutch auction.
+        </p>
+      </div>
+    </section>
+  );
+}
+
 function Hardening() {
   const items = [
     'Cache quotes per-user with short TTL (15-30s). Quotes expire.',
@@ -421,7 +529,7 @@ function Hardening() {
   ];
   return (
     <section className="max-w-5xl mx-auto px-6 py-10">
-      <div className="eyebrow mb-3">07 &middot; Production hardening</div>
+      <div className="eyebrow mb-3">08 &middot; Production hardening</div>
       <h2 className="font-serif text-3xl md:text-4xl gold-text mb-5 tracking-tightest">
         Checklist for the real integration.
       </h2>
