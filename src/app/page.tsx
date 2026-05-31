@@ -217,7 +217,7 @@ function Unlock() {
       n: '01',
       tag: 'Ondo stocks, first',
       h: 'TSLAon, AAPLon, NVDAon, in Cash.',
-      p: "Ondo Global Markets is the largest tokenized equity platform onchain, 260+ US stocks and ETFs live on Ethereum. ether.fi Cash users can't reach them today because Cash is on Optimism. Across closes the gap: USDC leaves the OP safe via the Swap API, settles on Ethereum at the MulticallHandler in ~2 seconds, and an embedded destination action delivers the requested Ondo GM token in the same transaction. Three sources wired and selectable per trade: Bebop RFQ (atomic, zero slippage; MMs are Ondo-approved holders so ether.fi inherits compliance at the MM layer), 1inch Aggregation (atomic, multi-DEX; routes 24/7), and 1inch Fusion (Dutch auction, best rates during US market hours via the Ondo x 1inch partnership). Recipient is ether.fi's choice (user wallet or Cash safe). Same path covers USDY, sUSDe, weETH, USDS, and any other Ethereum-only asset.",
+      p: "Ondo Global Markets is the largest tokenized equity platform onchain, 260+ US stocks and ETFs live on Ethereum. ether.fi Cash users can't reach them today because Cash is on Optimism. Across closes the gap: USDC leaves the OP safe via the Swap API, settles on Ethereum at the MulticallHandler in ~2 seconds, and an embedded destination action delivers the requested Ondo GM token in the same transaction. Three sources wired and selectable per trade: Bebop RFQ (atomic, zero slippage; MMs are Ondo-approved primary holders so ether.fi inherits compliance at the MM layer), 1inch Aggregation (atomic, multi-DEX routing; for Ondo GM typically routes through Bebop as one of its PMM sources, with 1inch's routing layer as fallback and broader coverage for non-RFQ assets), and 1inch Fusion (Dutch auction, best rates during US market hours via the Ondo x 1inch partnership; off-hours falls back cleanly). Recipient is ether.fi's choice (user wallet or Cash safe). Same path covers USDY, sUSDe, weETH, USDS, and any other Ethereum-only asset.",
     },
     {
       n: '02',
@@ -282,7 +282,7 @@ function OndoStocks() {
     { n: '01', t: 'USDC leaves OP', d: 'Cash safe debits via Across SpokePool. One user signature, declares min output.' },
     { n: '02', t: 'Across settles on ETH', d: 'Relayer fronts USDC to the MulticallHandler in ~2 seconds, UMA-secured.' },
     { n: '03', t: 'MulticallHandler routes', d: 'Approves the destination liquidity source and executes the swap atomically inside the same fill. Across never holds funds.' },
-    { n: '04', t: 'Destination source fills', d: 'Bebop RFQ for zero slippage, 1inch Aggregation for 24/7 multi-DEX routing, or 1inch Fusion for best rates during US market hours. ether.fi picks per trade.' },
+    { n: '04', t: 'Destination source fills', d: 'Bebop RFQ (atomic, zero slippage on the quoted amount), 1inch Aggregation (atomic, multi-DEX; for Ondo GM typically routes through Bebop as a PMM, fallback for non-RFQ assets), or 1inch Fusion (Dutch auction, best rates during US market hours). ether.fi picks per trade.' },
     { n: '\u2713', t: 'Abstracted in Cash UI', d: 'User sees TSLAon balance. Recipient is ether.fi\u2019s choice: user wallet or Cash safe. Sell path is symmetric.' },
   ];
 
@@ -626,7 +626,7 @@ function Architecture() {
 function PathRoadmap() {
   const pathA = [
     'Across delivers USDC atomically to Ethereum in ~2 seconds via the Swap API. The same call executes an embedded destination action in the same transaction.',
-    'Three destination sources wired today: Bebop RFQ (atomic, zero slippage), 1inch Aggregation (atomic, 24/7 multi-DEX), 1inch Fusion (Dutch auction, best rates during US market hours via the Ondo x 1inch partnership).',
+    'Three destination sources wired today: Bebop RFQ (atomic, zero slippage on the quoted amount, MMs are Ondo-approved primary holders), 1inch Aggregation (atomic, multi-DEX; for Ondo GM typically routes through Bebop as a PMM source, broader coverage for non-RFQ assets), 1inch Fusion (Dutch auction, best rates during US market hours via the Ondo x 1inch partnership).',
     'ether.fi picks the source per trade. Same Across rails throughout. Toggle live in the PoC demo.',
     'Light lift on ether.fi\u2019s side. Drop the action payload into your existing Across Swap API call. Full integration reference open-sourced.',
     'Live coverage today: TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, CRCLon.',

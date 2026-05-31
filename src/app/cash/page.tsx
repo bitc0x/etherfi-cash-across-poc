@@ -523,8 +523,11 @@ export default function CashDemo() {
   //      on the Fusion path.
   //  (b) USDC ETH -> 1inch Aggregation Router v6 on Ethereum (so the Fusion
   //      resolver can pull USDC for the swap fill).
-  // USDC native on Ethereum does NOT support EIP-2612 permit, so (b) must be a
-  // separate approve() tx. One-time per user.
+  // USDC on Ethereum mainnet (Circle's FiatTokenV2.2) does support EIP-2612 permit
+  // (DOMAIN_SEPARATOR + nonces verified on-chain), so a production integration
+  // could include a permit signature in the Fusion order's extension instead of a
+  // separate approve. In the PoC we use a standard approve() tx for clarity —
+  // one-time per user, persists forever.
   const SPOKE_POOL_OP = '0x6f26Bf09B1C792e3228e5467807a900A503c0281' as const;
   const ONEINCH_ROUTER_V6_ETH = '0x111111125421cA6dc452d289314280a0f8842A65' as const;
   const USDC_ETH_ADDR = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as const;
@@ -1673,7 +1676,8 @@ function DemoBanner() {
           trade. For TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, CRCLon a three-way{' '}
           <span className="text-cream-50 font-semibold">destination liquidity toggle</span>{' '}
           appears next to the trade form: Bebop RFQ (atomic, zero slippage), 1inch Aggregation
-          (atomic, multi-DEX, 24/7), or 1inch Fusion (Dutch auction, best rates during US
+          (atomic, multi-DEX; for Ondo GM typically routes via Bebop as a PMM), or 1inch
+          Fusion (Dutch auction, best rates during US
           market hours). AAPLon, SPYon, QQQon render the architecture preview only (awaiting
           Bebop coverage). USDY and the live yield assets below use the direct Across Swap
           API path. Integration reference for ether.fi:{' '}
