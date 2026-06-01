@@ -39,5 +39,21 @@ export function friendlyError(raw: string): string {
     return 'This route is not currently supported.';
   if (s.includes('quote_fetch_failed') || s.includes('quote failed'))
     return 'Could not fetch a live quote. Try again in a moment.';
-  return raw.length > 140 ? raw.slice(0, 140) + '...' : raw;
+  // Long messages get truncated, but the limit must clear a full Ethereum tx
+  // URL (https://optimistic.etherscan.io/tx/ + 66-char hash = ~100 chars) plus
+  // surrounding context. If the cut would land inside an https URL, extend
+  // it to the URL's end so the link stays clickable.
+  const LIMIT = 500;
+  if (raw.length <= LIMIT) return raw;
+  let cut = LIMIT;
+  const urlRegex = /https?:\/\/\S+/g;
+  for (const m of raw.matchAll(urlRegex)) {
+    const start = m.index ?? 0;
+    const end = start + m[0].length;
+    if (start < LIMIT && end > LIMIT) {
+      cut = end;
+      break;
+    }
+  }
+  return raw.slice(0, cut) + '...';
 }

@@ -754,16 +754,21 @@ export default function CashDemo() {
         // whose topics[2] decodes to a "small" integer (real depositIds are
         // sequential counters in the low millions, not 32-byte hashes).
         let depositId: string | null = null;
+        let depositIdSkipReason: string | null = null;
         try {
-          if (opPublicClient) {
+          if (!opPublicClient) {
+            depositIdSkipReason = 'no public client for chain 10';
+          } else {
             const receipt = await opPublicClient.waitForTransactionReceipt({
               hash: depositTxHash,
               timeout: 30_000,
             });
             const spokeLower = SPOKE_POOL_OP.toLowerCase();
+            let sawSpokeLog = false;
             for (const log of receipt.logs) {
               if (log.address.toLowerCase() !== spokeLower) continue;
               if (log.topics.length < 3) continue;
+              sawSpokeLog = true;
               const topic2 = log.topics[2];
               if (!topic2) continue;
               const asBigInt = BigInt(topic2);
@@ -775,9 +780,14 @@ export default function CashDemo() {
                 break;
               }
             }
+            if (!depositId) {
+              depositIdSkipReason = sawSpokeLog
+                ? 'SpokePool log topic[2] not depositId-shaped'
+                : 'no SpokePool log in receipt';
+            }
           }
         } catch (e) {
-          // Receipt fetch or parse failed; fall back to depositTxHash polling.
+          depositIdSkipReason = `receipt parse failed: ${e instanceof Error ? e.message.slice(0, 80) : String(e).slice(0, 80)}`;
           console.warn('[fusion] could not extract depositId from receipt:', e);
         }
 
@@ -807,9 +817,11 @@ export default function CashDemo() {
         if (!arrived) {
           // Recoverable: USDC may still arrive any minute. Surface diagnostic
           // info so the user can verify on Etherscan and we can debug if needed.
-          const depositIdNote = depositId ? ` (depositId ${depositId})` : '';
+          const idStatus = depositId
+            ? `depositId ${depositId}`
+            : `depositId unavailable (${depositIdSkipReason ?? 'unknown reason'})`;
           throw new Error(
-            `Across delivery hasn\u2019t shown as filled after 4 minutes${depositIdNote}. ` +
+            `Across delivery hasn\u2019t shown as filled after 4 minutes. ${idStatus}. ` +
             `Verify on Optimistic Etherscan: https://optimistic.etherscan.io/tx/${depositTxHash}. ` +
             `If the deposit arrived, the Fusion order is already signed and will be submitted on next attempt.`,
           );
