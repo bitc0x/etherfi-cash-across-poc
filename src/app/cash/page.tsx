@@ -106,14 +106,19 @@ type Phase =
   | 'signing'
   | 'filling'
   | 'filled'
-  // Fusion-specific phases (async, two-signature flow)
-  | 'fusion-approving-usdc'   // Pre-flight USDC -> Aggregation Router allowance
-  | 'fusion-bridging'         // Across deposit in flight, USDC moving to user wallet on Ethereum
-  | 'fusion-bridged'          // USDC arrived, ready to submit Fusion order
-  | 'fusion-signing-order'    // Prompting EIP-712 signature for the limit order
-  | 'fusion-submitting'       // POSTing signed order to 1inch relayer
+  // Fusion-specific phases.
+  // Option A Level 1: tight sequential UX. Both signatures captured upfront
+  // back-to-back, then async wait for Across delivery, then submit signed order.
+  | 'fusion-approving-usdc'   // Pre-flight USDC -> Aggregation Router allowance (one-time)
+  | 'fusion-preparing'        // Fetching /api/swap + building Fusion order upfront
+  | 'fusion-confirm-bridge'   // Step 1 of 2: user signs Across depositV3 on Optimism
+  | 'fusion-confirm-order'    // Step 2 of 2: user signs EIP-712 Fusion order on Ethereum
+  | 'fusion-bridging'         // Across in flight; both sigs already captured. No user action.
+  | 'fusion-bridged'          // (legacy, retained for back-compat; no longer set)
+  | 'fusion-signing-order'    // (legacy, retained for back-compat; replaced by fusion-confirm-order)
+  | 'fusion-submitting'       // POSTing the pre-signed order to 1inch's relayer
   | 'fusion-auction'          // Order in Dutch auction, resolvers competing
-  | 'fusion-filled'           // Resolver filled the order, output token delivered
+  | 'fusion-filled'           // Resolver filled, output token delivered
   | 'fusion-expired'          // Auction window closed without fill; USDC stays in user wallet
   | 'error';
 
@@ -571,18 +576,40 @@ export default function CashDemo() {
     setError(null);
 
     // ==============================================================
-    // BRANCH F: 1inch Fusion async path (two signatures, Dutch auction)
+    // BRANCH F: 1inch Fusion async path — Option A Level 1 (tight sequential UX).
+    //
+    // Both user signatures captured BACK-TO-BACK upfront. No waiting between
+    // them. After both are captured, Across delivery + Fusion submission run
+    // headless (no user interaction).
+    //
+    // Why Pattern A (sign upfront) instead of sign-after-delivery:
+    //   - User experience is one continuous flow: "step 1 of 2" then "step 2
+    //     of 2", not "sign, wait 4 seconds, sign again."
+    //   - Half-day of work vs full smart-wallet integration (Level 2).
+    //
+    // The amount-drift risk that previously argued against upfront signing is
+    // mitigated here by building the Fusion order against Across's
+    // GUARANTEED delivery floor (swapResp.minOutputAmount), not the
+    // expectedOutputAmount. Any positive drift between quote and fill stays
+    // in the user's wallet as residual; the resolver always has enough USDC
+    // to pull because actual_arrived >= minOutputAmount by Across's contract.
+    //
+    // Note (smart wallets): for users on Coinbase Smart Wallet, Safe, Argent,
+    // ZeroDev, or any EIP-5792-capable wallet, the USDC OP approval + Across
+    // deposit can be batched into one prompt via wallet_sendCalls, collapsing
+    // this to effectively a single user interaction. Not implemented in the
+    // PoC; flagged in the demo footnote as Level 2.
     //
     // Flow:
     //   1. (optional) Approve USDC ETH -> 1inch Aggregation Router (one-time per user)
     //   2. (optional) Approve USDC OP  -> Across SpokePool         (one-time per user)
-    //   3. Sign + send Across depositV3 on Optimism, recipient = user wallet on
-    //      Ethereum, NO embedded action. Across just bridges USDC.
-    //   4. Poll Across /deposit/status until USDC arrives on user's Ethereum wallet (~2-4s)
-    //   5. Build the Fusion order via SDK, get EIP-712 typedData
-    //   6. User signs typedData (off-chain, no gas)
-    //   7. POST signed order to 1inch relayer
-    //   8. Poll Fusion order status until filled or expired
+    //   3. Fetch /api/swap (Across deposit calldata + minOutputAmount)
+    //   4. Build Fusion order via SDK against minOutputAmount
+    //   5. SIGNATURE 1 of 2: sendTransaction(swapTx) on Optimism
+    //   6. SIGNATURE 2 of 2: signTypedData(Fusion order) on Ethereum   <-- back-to-back
+    //   7. Poll /api/status until USDC arrives on Ethereum (no user action)
+    //   8. POST signed Fusion order to /api/fusion-submit
+    //   9. Poll /api/fusion-status until filled or expired
     // ==============================================================
     if (
       liquiditySource === 'oneinch-fusion' &&
@@ -594,10 +621,9 @@ export default function CashDemo() {
         const opChain = 10;
         const ethChain = 1;
 
-        // Estimate the post-bridge USDC amount (Across charges ~25-30bps on
-        // USDC OP -> USDC ETH). We need at least this much approved on the
-        // Ethereum router. The actual /api/swap response gives us the precise
-        // figure; this estimate is just for the allowance pre-flight check.
+        // Conservative estimate for the USDC ETH allowance check (Across charges
+        // ~25-30 bps on USDC OP -> USDC ETH). Used only for the pre-flight gate;
+        // the actual order amount comes from swapResp.minOutputAmount below.
         const estUsdcEth = (raw * 997n) / 1000n;
 
         // --------- Step 1: USDC ETH -> 1inch Router approval (one-time) ---------
@@ -634,8 +660,10 @@ export default function CashDemo() {
           });
         }
 
-        // --------- Step 3: Build + send Across deposit (vanilla, no actions) ---------
-        if (chainId !== opChain) await switchChain({ chainId: opChain });
+        // --------- Step 3: Fetch Across deposit + build Fusion order UPFRONT ---------
+        // Both are constructed BEFORE any user signature is captured so the
+        // two sigs can fire back-to-back without any await between them.
+        setPhase('fusion-preparing');
         const swapUrl = new URL('/api/swap', window.location.origin);
         swapUrl.searchParams.set('inputToken', ORIGIN_USDC.address);
         swapUrl.searchParams.set('outputToken', USDC_ETH_ADDR);
@@ -648,7 +676,38 @@ export default function CashDemo() {
         if (swapResp.error || !swapResp.swapTx) {
           throw new Error(swapResp.error || 'across /swap returned no tx');
         }
-        setPhase('fusion-bridging');
+
+        // Build the Fusion order against the GUARANTEED delivery floor, not the
+        // expected output. minOutputAmount is what Across contractually
+        // guarantees will arrive (or revert + refund). Building against this
+        // floor means: actual_arrived >= order.makingAmount, ALWAYS.
+        // Any positive drift between expected and actual stays as residual
+        // USDC in the user's Ethereum wallet (small, acceptable).
+        const orderMakingAmount =
+          swapResp.minOutputAmount || swapResp.expectedOutputAmount;
+        if (!orderMakingAmount) {
+          throw new Error('across /swap missing minOutputAmount / expectedOutputAmount');
+        }
+
+        const buildResp = await fetch('/api/fusion-build-order', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fromTokenAddress: USDC_ETH_ADDR,
+            toTokenAddress: selectedAsset.token!.address,
+            amount: orderMakingAmount,
+            walletAddress: address,
+            preset: 'fast',
+            source: 'etherfi-cash-across-poc',
+          }),
+        }).then((r) => r.json());
+        if (buildResp.error || !buildResp.typedData) {
+          throw new Error(buildResp.error || 'fusion order build failed');
+        }
+
+        // --------- SIGNATURE 1 of 2: Across deposit on Optimism ---------
+        if (chainId !== opChain) await switchChain({ chainId: opChain });
+        setPhase('fusion-confirm-bridge');
         const depositTxHash = await sendTransactionAsync({
           to: swapResp.swapTx.to as `0x${string}`,
           data: swapResp.swapTx.data as `0x${string}`,
@@ -656,7 +715,32 @@ export default function CashDemo() {
         });
         setOriginTxHash(depositTxHash);
 
-        // --------- Step 4: Wait for Across delivery ---------
+        // --------- SIGNATURE 2 of 2: Fusion EIP-712 order on Ethereum ---------
+        // Fires immediately after sig 1 resolves. No polling / no wait between.
+        // The chain switch to Ethereum is silent on most wallets when the chain
+        // is already known (it's just a context change for the typed-data
+        // signature; no on-chain action).
+        if (chainId !== ethChain) await switchChain({ chainId: ethChain });
+        setPhase('fusion-confirm-order');
+        // Strip EIP712Domain from types - wagmi/viem add it internally and
+        // including it explicitly causes a duplicate-type error in some wallets.
+        const signTypes = { ...(buildResp.typedData.types as Record<string, unknown>) };
+        delete (signTypes as Record<string, unknown>).EIP712Domain;
+        const signature = await signTypedDataAsync({
+          domain: {
+            name: buildResp.typedData.domain.name,
+            version: buildResp.typedData.domain.version,
+            chainId: buildResp.typedData.domain.chainId,
+            verifyingContract: buildResp.typedData.domain.verifyingContract as `0x${string}`,
+          },
+          types: signTypes as Record<string, Array<{ name: string; type: string }>>,
+          primaryType: buildResp.typedData.primaryType as 'Order',
+          message: buildResp.typedData.message as Record<string, unknown>,
+        });
+
+        // Both signatures captured. From here on, no user interaction.
+        // --------- Step 4 (async): wait for Across to deliver USDC ---------
+        setPhase('fusion-bridging');
         const startBridge = Date.now();
         let arrived = false;
         while (Date.now() - startBridge < 120_000) {
@@ -677,46 +761,8 @@ export default function CashDemo() {
           } catch {}
         }
         if (!arrived) throw new Error('Across delivery timed out after 2 minutes');
-        setPhase('fusion-bridged');
 
-        // --------- Step 5: Build Fusion order with the precise post-bridge amount ---------
-        const arrivedAmount = swapResp.expectedOutputAmount;
-        const buildResp = await fetch('/api/fusion-build-order', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fromTokenAddress: USDC_ETH_ADDR,
-            toTokenAddress: selectedAsset.token!.address,
-            amount: arrivedAmount,
-            walletAddress: address,
-            preset: 'fast',
-            source: 'etherfi-cash-across-poc',
-          }),
-        }).then((r) => r.json());
-        if (buildResp.error || !buildResp.typedData) {
-          throw new Error(buildResp.error || 'fusion order build failed');
-        }
-
-        // --------- Step 6: User signs the EIP-712 order ---------
-        if (chainId !== ethChain) await switchChain({ chainId: ethChain });
-        setPhase('fusion-signing-order');
-        // Strip EIP712Domain from types - wagmi/viem add it internally and
-        // including it explicitly causes a duplicate-type error in some wallets.
-        const signTypes = { ...(buildResp.typedData.types as Record<string, unknown>) };
-        delete (signTypes as Record<string, unknown>).EIP712Domain;
-        const signature = await signTypedDataAsync({
-          domain: {
-            name: buildResp.typedData.domain.name,
-            version: buildResp.typedData.domain.version,
-            chainId: buildResp.typedData.domain.chainId,
-            verifyingContract: buildResp.typedData.domain.verifyingContract as `0x${string}`,
-          },
-          types: signTypes as Record<string, Array<{ name: string; type: string }>>,
-          primaryType: buildResp.typedData.primaryType as 'Order',
-          message: buildResp.typedData.message as Record<string, unknown>,
-        });
-
-        // --------- Step 7: Submit signed order to 1inch relayer ---------
+        // --------- Step 5: Submit the pre-signed Fusion order to relayer ---------
         setPhase('fusion-submitting');
         const submitResp = await fetch('/api/fusion-submit', {
           method: 'POST',
@@ -732,7 +778,7 @@ export default function CashDemo() {
         if (submitResp.error) throw new Error(submitResp.error);
         setFusionOrderHash(buildResp.orderHash);
 
-        // --------- Step 8: Poll Fusion order status ---------
+        // --------- Step 6: Poll Fusion order status ---------
         setPhase('fusion-auction');
         const startAuction = Date.now();
         const pollFusion = async () => {
@@ -996,8 +1042,12 @@ export default function CashDemo() {
                     <div className="text-[11px] text-cream-400 leading-tight">
                       {liquiditySource === 'oneinch-fusion' ? (
                         <>
-                          Async pattern: Across delivers USDC to your Ethereum wallet, then you sign a Fusion order
-                          for resolvers to fill via Dutch auction. Two signatures.
+                          Async pattern: sign the cross-chain transfer and the Fusion order
+                          back-to-back upfront, then Across delivers USDC and resolvers fill via
+                          Dutch auction. Two signatures.{' '}
+                          <span className="text-cream-500">
+                            Smart-wallet accounts (Coinbase Smart Wallet, Safe, Argent) collapse this to a single prompt via EIP-5792.
+                          </span>
                         </>
                       ) : (
                         <>
@@ -1406,6 +1456,9 @@ export default function CashDemo() {
                     phase === 'filling' ||
                     phase === 'approving' ||
                     phase === 'fusion-approving-usdc' ||
+                    phase === 'fusion-preparing' ||
+                    phase === 'fusion-confirm-bridge' ||
+                    phase === 'fusion-confirm-order' ||
                     phase === 'fusion-bridging' ||
                     phase === 'fusion-bridged' ||
                     phase === 'fusion-signing-order' ||
@@ -1420,11 +1473,12 @@ export default function CashDemo() {
                   {phase === 'signing' && 'Confirm in wallet...'}
                   {phase === 'filling' &&
                     (mode === 'buy' ? 'Filling on Ethereum...' : 'Filling on Optimism...')}
-                  {/* Fusion-specific phase labels */}
+                  {/* Fusion-specific phase labels (Option A Level 1 sequential UX) */}
                   {phase === 'fusion-approving-usdc' && 'Approving USDC for 1inch Router...'}
-                  {phase === 'fusion-bridging' && 'Bridging USDC via Across...'}
-                  {phase === 'fusion-bridged' && 'USDC arrived. Preparing Fusion order...'}
-                  {phase === 'fusion-signing-order' && 'Sign Fusion order in wallet...'}
+                  {phase === 'fusion-preparing' && 'Preparing your order...'}
+                  {phase === 'fusion-confirm-bridge' && 'Step 1 of 2: Confirm cross-chain transfer'}
+                  {phase === 'fusion-confirm-order' && 'Step 2 of 2: Sign purchase order'}
+                  {phase === 'fusion-bridging' && 'Bridging and filling...'}
                   {phase === 'fusion-submitting' && 'Submitting to 1inch relayer...'}
                   {phase === 'fusion-auction' && `Resolver competing on Dutch auction...`}
                   {(phase === 'idle' || phase === 'quoted' || phase === 'error') &&

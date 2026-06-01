@@ -465,14 +465,35 @@ function AsyncPattern() {
       <p className="text-cream-300 leading-relaxed mb-5">
         This is two user signatures total: one for the Across deposit transaction on Optimism,
         one for the EIP-712 Fusion order on Ethereum. Plus one-time ERC20 approvals at first
-        use. The PoC signs <span className="text-cream-100">sequentially</span> (Across first,
-        wait for delivery, then Fusion) rather than capturing both signatures upfront. The
-        reason: signing the Fusion order <span className="text-cream-100">after</span> USDC
-        arrival lets us set <code className="inline-code">makingAmount</code> to the exact
-        post-bridge USDC balance, so the resolver fills against a known quantity. Signing
-        upfront with an estimated amount risks small partial fills or rejections if Across
-        fees drift between quote and delivery. Both orderings are valid; the doc describes
-        what the PoC does.
+        use. The PoC captures{' '}
+        <span className="text-cream-100">both signatures back-to-back upfront</span>{' '}
+        (Option A Level 1 sequential UX), then runs the Across delivery and Fusion submission
+        headless with no user interaction in between. From the user&rsquo;s perspective: two
+        wallet prompts in immediate succession, then a single &ldquo;bridging and filling&rdquo;
+        progress state until the output token lands.
+      </p>
+      <p className="text-cream-300 leading-relaxed mb-5">
+        The amount-drift risk that argues against signing upfront is mitigated by building the
+        Fusion order against Across&rsquo;s guaranteed delivery floor (
+        <code className="inline-code">swapResp.minOutputAmount</code>), not the
+        <code className="inline-code">expectedOutputAmount</code>. By Across&rsquo;s atomic-fail
+        contract, what arrives is always{' '}
+        <code className="inline-code">&ge; minOutputAmount</code> (or the deposit reverts and
+        refunds). So the resolver always has enough USDC to fill against{' '}
+        <code className="inline-code">order.makingAmount = minOutputAmount</code>; any positive
+        delta between expected and actual stays in the user&rsquo;s Ethereum wallet as small
+        residual. The order&rsquo;s{' '}
+        <code className="inline-code">auctionEndAmount</code> still enforces the user&rsquo;s
+        minimum acceptable output token: resolvers cannot fill below it.
+      </p>
+      <p className="text-cream-300 leading-relaxed mb-5">
+        Note for smart-wallet users: on Coinbase Smart Wallet, Safe, Argent, ZeroDev, or any
+        EIP-5792-capable account, the USDC OP approval and Across deposit can be batched into
+        a single prompt via <code className="inline-code">wallet_sendCalls</code>, collapsing
+        the flow to effectively one user interaction (the bundled OP-side batch, then the
+        Ethereum-side Fusion signature). The PoC ships the Level 1 sequential path that works
+        with vanilla EOAs today; the Level 2 smart-wallet batching is a drop-in upgrade behind
+        a <code className="inline-code">wallet_getCapabilities</code> feature detection.
       </p>
 
       {/* SDK install + package callout - engineers want exact npm command */}
@@ -514,44 +535,46 @@ function AsyncPattern() {
           <li className="flex gap-3">
             <span className="text-gold-300 font-mono tabular flex-shrink-0">2</span>
             <span>
-              <span className="text-cream-100 font-semibold">Across deposit (signature 1).</span>{' '}
-              POST to <code className="inline-code">/swap/approval</code> with{' '}
+              <span className="text-cream-100 font-semibold">Prepare both legs upfront.</span>{' '}
+              No user signature yet. Fetch the Across deposit calldata via{' '}
+              <code className="inline-code">/swap/approval</code> with{' '}
               <code className="inline-code">recipient = user&rsquo;s Ethereum wallet</code> and{' '}
-              <code className="inline-code">no actions[]</code> &mdash; Across simply bridges
-              USDC. Plain USDC delivery in ~2&ndash;4 seconds. Min output guaranteed by{' '}
-              <code className="inline-code">minOutputAmount</code> in the deposit struct, same
-              as any vanilla Across bridge.
+              <code className="inline-code">no actions[]</code>, then call{' '}
+              <code className="inline-code">sdk.createOrder()</code> with{' '}
+              <code className="inline-code">amount = swapResp.minOutputAmount</code>. The SDK
+              returns the EIP-712 typed data plus encoded extension bytes (auction parameters,
+              whitelisted resolvers, fee config).
             </span>
           </li>
           <li className="flex gap-3">
             <span className="text-gold-300 font-mono tabular flex-shrink-0">3</span>
             <span>
-              <span className="text-cream-100 font-semibold">Build the Fusion order.</span> Once
-              USDC arrives, fetch a Fusion quote and call{' '}
-              <code className="inline-code">sdk.createOrder()</code> with the precise post-bridge
-              USDC amount. The SDK returns the EIP-712 typed data plus encoded extension bytes
-              (auction parameters, whitelisted resolvers, fee config). Min output is enforced by
-              the order&rsquo;s <code className="inline-code">auctionEndAmount</code>: resolvers
-              cannot fill below it.
+              <span className="text-cream-100 font-semibold">Signature 1 of 2: confirm cross-chain transfer.</span>{' '}
+              User signs and sends the Across deposit transaction on Optimism. UI shows
+              &ldquo;Step 1 of 2&rdquo;.
             </span>
           </li>
           <li className="flex gap-3">
             <span className="text-gold-300 font-mono tabular flex-shrink-0">4</span>
             <span>
-              <span className="text-cream-100 font-semibold">User signs the Fusion order (signature 2).</span>{' '}
-              Off-chain EIP-712 signature via the wallet (no gas). The signed order plus
-              extension is POSTed to 1inch&rsquo;s relayer through{' '}
-              <code className="inline-code">/api/fusion-submit</code>.
+              <span className="text-cream-100 font-semibold">Signature 2 of 2: sign the Fusion order.</span>{' '}
+              Fires <span className="text-cream-100">immediately</span> after sig 1 resolves &mdash;
+              no polling, no &ldquo;click to continue&rdquo;. Off-chain EIP-712 signature
+              (no gas). UI shows &ldquo;Step 2 of 2&rdquo;. From here on, no further user
+              interaction.
             </span>
           </li>
           <li className="flex gap-3">
             <span className="text-gold-300 font-mono tabular flex-shrink-0">5</span>
             <span>
-              <span className="text-cream-100 font-semibold">Dutch auction.</span> Whitelisted
-              resolvers compete to fill. Typical fill window 30s&ndash;3min during liquid market
-              conditions. Output token settles into the user&rsquo;s wallet on Ethereum. Status
-              polled via <code className="inline-code">/api/fusion-status</code> (proxying{' '}
-              <code className="inline-code">sdk.getOrderStatus(orderHash)</code>).
+              <span className="text-cream-100 font-semibold">Headless: bridge then submit then fill.</span>{' '}
+              Poll <code className="inline-code">/api/deposit/status</code> until USDC arrives
+              on Ethereum (~2&ndash;4s), POST the pre-signed order to 1inch&rsquo;s relayer via{' '}
+              <code className="inline-code">/api/fusion-submit</code>, then poll{' '}
+              <code className="inline-code">/api/fusion-status</code> until the resolver fills
+              (typical 30s&ndash;3min during liquid market conditions). Output token settles
+              into the user&rsquo;s wallet on Ethereum. UI shows &ldquo;Bridging and
+              filling...&rdquo; throughout.
             </span>
           </li>
         </ol>
@@ -634,20 +657,44 @@ GET https://api.1inch.dev/fusion/orders/v2.0/{chainId}/order/status/{orderHash}
 
       <div className="rounded-2xl border border-gold-500/15 bg-gold-500/[0.02] p-5">
         <div className="text-[10px] uppercase tracking-widest gold-text font-semibold mb-3">
-          Future: single-signature Fusion via Pattern B
+          Upgrade ladder beyond two prompts
         </div>
         <p className="text-sm text-cream-300 leading-relaxed mb-3">
-          The PoC uses Pattern A (user is the Fusion order maker, two user signatures). There&rsquo;s
-          a Pattern B that collapses Fusion into a single signature: have the MulticallHandler
-          itself act as the Fusion maker, signing orders via ERC-1271 on-chain after Across
-          delivers USDC. The user signs only the Across deposit; the handler authorizes the
-          Fusion fill via contract signature.
+          The PoC ships Option A Level 1 (two back-to-back prompts, works with any EOA today).
+          Two cleaner UX states are reachable without architectural change:
         </p>
-        <p className="text-sm text-cream-300 leading-relaxed">
-          Pattern B requires a custom MulticallHandler extension and resolver-side acceptance of
-          ERC-1271 signatures (supported by 1inch&rsquo;s settlement contract). Out of scope for
-          the PoC, but worth flagging so engineers reading this know single-sig Fusion is
-          architecturally reachable.
+        <div className="space-y-3 mb-3">
+          <div className="rounded-xl bg-bg-800/40 border border-white/[0.04] p-3.5">
+            <div className="text-[11px] font-semibold text-cream-100 mb-1.5">
+              Level 2 &middot; smart-wallet batching via EIP-5792
+            </div>
+            <p className="text-xs text-cream-400 leading-relaxed">
+              Coinbase Smart Wallet, Safe, Argent, ZeroDev, and other EIP-5792-capable accounts
+              expose <code className="inline-code">wallet_sendCalls</code> to batch multiple
+              operations into a single prompt. The USDC OP approval + Across deposit collapse
+              into one user-side batch on Optimism; the Fusion order signature follows on
+              Ethereum. Feature-detect via{' '}
+              <code className="inline-code">wallet_getCapabilities</code> and fall back to
+              Level 1 for vanilla EOAs. Drop-in upgrade, no contract changes.
+            </p>
+          </div>
+          <div className="rounded-xl bg-bg-800/40 border border-white/[0.04] p-3.5">
+            <div className="text-[11px] font-semibold text-cream-100 mb-1.5">
+              Pattern B &middot; single-signature Fusion via ERC-1271
+            </div>
+            <p className="text-xs text-cream-400 leading-relaxed">
+              Have a custom MulticallHandler extension act as the Fusion maker itself, signing
+              orders via on-chain ERC-1271 contract signature after Across delivers USDC. The
+              user signs only the Across deposit; the handler authorizes the Fusion fill.
+              Requires a custom handler contract and resolver-side ERC-1271 acceptance
+              (supported by 1inch&rsquo;s settlement contract). Bigger lift, single-prompt UX
+              for every wallet.
+            </p>
+          </div>
+        </div>
+        <p className="text-xs text-cream-500 leading-relaxed">
+          ether.fi can ship Level 1 today, layer Level 2 once smart-wallet support is in scope,
+          and reach Pattern B if single-sig UX becomes a hard product requirement.
         </p>
       </div>
     </section>
