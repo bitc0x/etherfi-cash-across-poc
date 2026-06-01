@@ -160,6 +160,12 @@ export default function CashDemo() {
   // Polling by depositId is more reliable than by tx hash: the indexer keys
   // deposits by ID, and tx-hash lookups can lag behind ID-based ones.
   const opPublicClient = usePublicClient({ chainId: 10 });
+  // Ethereum public client for on-demand USDC->1inch Router allowance reads
+  // inside the Fusion execute() path. Avoids the wagmi useReadContract loading
+  // race where a hard-refresh + quick Buy click sees allowance===undefined and
+  // triggers an unnecessary approval prompt even when the on-chain allowance
+  // is already max.
+  const ethPublicClient = usePublicClient({ chainId: 1 });
 
   // Dynamic data
   const [destTokens, setDestTokens] = useState<AcrossToken[]>([]);
@@ -632,10 +638,28 @@ export default function CashDemo() {
         const estUsdcEth = (raw * 997n) / 1000n;
 
         // --------- Step 1: USDC ETH -> 1inch Router approval (one-time) ---------
-        if (
-          fusionEthRouterAllowance === undefined ||
-          (fusionEthRouterAllowance as bigint) < estUsdcEth
-        ) {
+        // On-demand allowance read via publicClient. The wagmi useReadContract
+        // hook (fusionEthRouterAllowance above) can return undefined while still
+        // loading. Reading it here at click-time gives a definitive answer and
+        // prevents firing an unnecessary approval prompt when the on-chain
+        // allowance is already sufficient.
+        let liveEthAllowance: bigint = 0n;
+        if (ethPublicClient) {
+          try {
+            liveEthAllowance = (await ethPublicClient.readContract({
+              address: USDC_ETH_ADDR,
+              abi: ERC20_ALLOWANCE_ABI,
+              functionName: 'allowance',
+              args: [address as `0x${string}`, ONEINCH_ROUTER_V6_ETH],
+            })) as bigint;
+          } catch {
+            // On read failure, treat as 0 to force the approval prompt — safer
+            // than skipping (a missing approval would cause the Fusion fill to
+            // revert; an extra approval just costs gas).
+            liveEthAllowance = 0n;
+          }
+        }
+        if (liveEthAllowance < estUsdcEth) {
           if (chainId !== ethChain) await switchChain({ chainId: ethChain });
           setPhase('fusion-approving-usdc');
           const max = (1n << 256n) - 1n;
@@ -650,10 +674,22 @@ export default function CashDemo() {
         }
 
         // --------- Step 2: USDC OP -> SpokePool approval (one-time) ---------
-        if (
-          fusionOpSpokeAllowance === undefined ||
-          (fusionOpSpokeAllowance as bigint) < raw
-        ) {
+        // Mirror Step 1: on-demand read via opPublicClient to avoid the same
+        // wagmi useReadContract loading-race firing an unnecessary OP approval.
+        let liveOpAllowance: bigint = 0n;
+        if (opPublicClient) {
+          try {
+            liveOpAllowance = (await opPublicClient.readContract({
+              address: ORIGIN_USDC.address as `0x${string}`,
+              abi: ERC20_ALLOWANCE_ABI,
+              functionName: 'allowance',
+              args: [address as `0x${string}`, SPOKE_POOL_OP],
+            })) as bigint;
+          } catch {
+            liveOpAllowance = 0n;
+          }
+        }
+        if (liveOpAllowance < raw) {
           if (chainId !== opChain) await switchChain({ chainId: opChain });
           setPhase('approving');
           const max = (1n << 256n) - 1n;
