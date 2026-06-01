@@ -846,6 +846,13 @@ export default function CashDemo() {
             const j = await r.json();
             setFusionStatus(j);
             if (j?.status === 'filled') {
+              // 1inch order status returns the resolver's fillOrder tx in
+              // fills[0].txHash (verified against live filled order schema).
+              // That tx is the on-chain Ethereum settlement where USDC is
+              // pulled from the maker and the destination token is delivered.
+              // It's the natural "fill tx" to surface in the success state.
+              const fillTx = j?.fills?.[0]?.txHash;
+              if (fillTx) setFillTxHash(fillTx);
               setPhase('fusion-filled');
               return;
             }
