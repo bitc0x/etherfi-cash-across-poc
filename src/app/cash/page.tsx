@@ -1249,9 +1249,30 @@ export default function CashDemo() {
                   )}
                 </div>
                 <div className="text-xs text-cream-400 line-clamp-2">
-                  {mode === 'buy'
-                    ? selectedAsset?.description
-                    : 'Lands directly in the Cash safe on Optimism. Spendable on card immediately.'}
+                  {(() => {
+                    if (mode !== 'buy') {
+                      return 'Lands directly in the Cash safe on Optimism. Spendable on card immediately.';
+                    }
+                    // For Bebop-buyable Ondo GM stocks, the routing changes per
+                    // source toggle. Strip the static "Routed via Bebop RFQ..."
+                    // suffix from the asset description and append a sentence
+                    // that reflects whatever source is currently selected.
+                    if (isStockSelected && isBebopSelected) {
+                      const base = (selectedAsset?.description || '')
+                        .replace(/\s*Routed via[^.]*\.\s*$/, '')
+                        .trim();
+                      const routing =
+                        liquiditySource === 'oneinch-fusion'
+                          ? 'Routed via 1inch Fusion on Ethereum, Dutch auction filled by whitelisted resolvers.'
+                          : liquiditySource === 'oneinch-aggregation'
+                            ? 'Routed via 1inch Aggregation on Ethereum, multi-DEX routing atomic with the Across deposit.'
+                            : 'Routed via Bebop RFQ on Ethereum, atomic with the Across deposit.';
+                      return `${base} ${routing}`;
+                    }
+                    // Non-Bebop-buyable stocks (preview only) and live yield
+                    // assets keep their static descriptions from tokens.ts.
+                    return selectedAsset?.description;
+                  })()}
                 </div>
               </div>
             </div>
