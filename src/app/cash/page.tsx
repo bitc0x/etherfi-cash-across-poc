@@ -643,6 +643,7 @@ export default function CashDemo() {
           const amtPadded = max.toString(16).padStart(64, '0');
           const approveCalldata = `0x095ea7b3${spenderPadded}${amtPadded}` as `0x${string}`;
           await sendTransactionAsync({
+            chainId: ethChain,
             to: USDC_ETH_ADDR,
             data: approveCalldata,
           });
@@ -660,6 +661,7 @@ export default function CashDemo() {
           const amtPadded = max.toString(16).padStart(64, '0');
           const approveCalldata = `0x095ea7b3${spenderPadded}${amtPadded}` as `0x${string}`;
           await sendTransactionAsync({
+            chainId: opChain,
             to: ORIGIN_USDC.address as `0x${string}`,
             data: approveCalldata,
           });
@@ -714,6 +716,7 @@ export default function CashDemo() {
         if (chainId !== opChain) await switchChain({ chainId: opChain });
         setPhase('fusion-confirm-bridge');
         const depositTxHash = await sendTransactionAsync({
+          chainId: opChain,
           to: swapResp.swapTx.to as `0x${string}`,
           data: swapResp.swapTx.data as `0x${string}`,
           value: BigInt(swapResp.swapTx.value || '0'),
@@ -897,12 +900,14 @@ export default function CashDemo() {
           const data = `0x095ea7b3${spender}${amtHex}` as `0x${string}`;
           setPhase('approving');
           await sendTransactionAsync({
+            chainId: originChain,
             to: ORIGIN_USDC.address as `0x${string}`,
             data,
           });
         }
         setPhase('signing');
         const txHash = await sendTransactionAsync({
+          chainId: originChain,
           to: stockQuote.transaction.to as `0x${string}`,
           data: stockQuote.transaction.data as `0x${string}`,
           value: BigInt(stockQuote.transaction.value || '0'),
@@ -956,6 +961,7 @@ export default function CashDemo() {
         const data = `0x095ea7b3${spender}${amtHex}` as `0x${string}`;
         setPhase('approving');
         await sendTransactionAsync({
+          chainId: originChain,
           to: inputTokenAddress as `0x${string}`,
           data,
         });
@@ -964,6 +970,7 @@ export default function CashDemo() {
       if (!quote.swapTx) throw new Error('missing swap transaction in quote');
       setPhase('signing');
       const txHash = await sendTransactionAsync({
+        chainId: originChain,
         to: quote.swapTx.to as `0x${string}`,
         data: quote.swapTx.data as `0x${string}`,
         value: BigInt(quote.swapTx.value || '0'),
