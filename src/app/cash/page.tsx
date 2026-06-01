@@ -4,7 +4,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit';
 import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { useAccount, useBalance, useChainId, useReadContract, useSendTransaction, useSignTypedData, useSwitchChain } from 'wagmi';
+import { useAccount, useBalance, useChainId, usePublicClient, useReadContract, useSendTransaction, useSignTypedData, useSwitchChain } from 'wagmi';
 import type { AcrossChain, AcrossToken } from '@/lib/tokens';
 import { DEMO_DEST_SYMBOLS, isBebopBuyable, isStock, LOCAL_LOGO_OVERRIDES, ORIGIN_USDC, RELIABLE_LOGOS, STOCK_MOCK_PRICE } from '@/lib/tokens';
 import { formatUnits, friendlyError, parseUnits } from '@/lib/format';
@@ -155,6 +155,11 @@ export default function CashDemo() {
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
   const { sendTransactionAsync } = useSendTransaction();
+  // Optimism public client for parsing the Across deposit receipt (V3FundsDeposited
+  // event), so we can extract depositId and poll Across's status endpoint by ID.
+  // Polling by depositId is more reliable than by tx hash: the indexer keys
+  // deposits by ID, and tx-hash lookups can lag behind ID-based ones.
+  const opPublicClient = usePublicClient({ chainId: 10 });
 
   // Dynamic data
   const [destTokens, setDestTokens] = useState<AcrossToken[]>([]);
@@ -741,18 +746,57 @@ export default function CashDemo() {
         // Both signatures captured. From here on, no user interaction.
         // --------- Step 4 (async): wait for Across to deliver USDC ---------
         setPhase('fusion-bridging');
+
+        // Extract depositId from the receipt for reliable polling. Across's
+        // status endpoint indexes by depositId; tx-hash lookups can lag.
+        // SpokePool emits FundsDeposited / V3FundsDeposited with depositId as
+        // the second indexed param (topics[2]). We pick the SpokePool log
+        // whose topics[2] decodes to a "small" integer (real depositIds are
+        // sequential counters in the low millions, not 32-byte hashes).
+        let depositId: string | null = null;
+        try {
+          if (opPublicClient) {
+            const receipt = await opPublicClient.waitForTransactionReceipt({
+              hash: depositTxHash,
+              timeout: 30_000,
+            });
+            const spokeLower = SPOKE_POOL_OP.toLowerCase();
+            for (const log of receipt.logs) {
+              if (log.address.toLowerCase() !== spokeLower) continue;
+              if (log.topics.length < 3) continue;
+              const topic2 = log.topics[2];
+              if (!topic2) continue;
+              const asBigInt = BigInt(topic2);
+              // depositId is a sequential counter (well under 2^53). Anything
+              // larger is probably a different event (e.g. FilledRelay where
+              // topics[2] is a relay hash).
+              if (asBigInt > 0n && asBigInt < (1n << 53n)) {
+                depositId = asBigInt.toString();
+                break;
+              }
+            }
+          }
+        } catch (e) {
+          // Receipt fetch or parse failed; fall back to depositTxHash polling.
+          console.warn('[fusion] could not extract depositId from receipt:', e);
+        }
+
+        // Poll Across status. Use depositId primarily (more reliable), fall
+        // back to depositTxHash if we couldn't extract the ID. 4-minute
+        // timeout gives generous safety margin over the typical ~2s fill.
         const startBridge = Date.now();
+        const BRIDGE_TIMEOUT_MS = 240_000;
         let arrived = false;
-        while (Date.now() - startBridge < 120_000) {
-          await new Promise((r) => setTimeout(r, 2500));
+        while (Date.now() - startBridge < BRIDGE_TIMEOUT_MS) {
+          await new Promise((r) => setTimeout(r, 3000));
           try {
-            const r = await fetch(
-              `/api/status?originChainId=${opChain}&depositTxHash=${depositTxHash}`,
-              { cache: 'no-store' },
-            );
+            const params = new URLSearchParams({ originChainId: String(opChain) });
+            if (depositId) params.set('depositId', depositId);
+            else params.set('depositTxHash', depositTxHash);
+            const r = await fetch(`/api/status?${params.toString()}`, { cache: 'no-store' });
             if (r.ok) {
               const j = await r.json();
-              if (j?.status === 'filled' || j?.fillTx) {
+              if (j?.status === 'filled' || j?.fillTx || j?.fillTxHash) {
                 setFillTxHash(j.fillTx || j.fillTxHash || null);
                 arrived = true;
                 break;
@@ -760,7 +804,16 @@ export default function CashDemo() {
             }
           } catch {}
         }
-        if (!arrived) throw new Error('Across delivery timed out after 2 minutes');
+        if (!arrived) {
+          // Recoverable: USDC may still arrive any minute. Surface diagnostic
+          // info so the user can verify on Etherscan and we can debug if needed.
+          const depositIdNote = depositId ? ` (depositId ${depositId})` : '';
+          throw new Error(
+            `Across delivery hasn\u2019t shown as filled after 4 minutes${depositIdNote}. ` +
+            `Verify on Optimistic Etherscan: https://optimistic.etherscan.io/tx/${depositTxHash}. ` +
+            `If the deposit arrived, the Fusion order is already signed and will be submitted on next attempt.`,
+          );
+        }
 
         // --------- Step 5: Submit the pre-signed Fusion order to relayer ---------
         setPhase('fusion-submitting');
@@ -1524,8 +1577,29 @@ export default function CashDemo() {
                 </p>
               )}
               {error && phase === 'error' && (
-                <div className="mt-3 text-xs text-red-400 bg-red-500/[0.06] border border-red-500/20 rounded-xl p-3">
-                  {error}
+                <div className="mt-3 text-xs text-red-400 bg-red-500/[0.06] border border-red-500/20 rounded-xl p-3 leading-relaxed">
+                  {/* Auto-link any https URLs so recovery links (e.g. Etherscan)
+                      embedded in error messages become clickable. */}
+                  {error.split(/(\s+)/).map((piece, i) => {
+                    const trimmed = piece.replace(/[.,;:!?)]+$/, '');
+                    if (/^https?:\/\//.test(trimmed)) {
+                      const trailing = piece.slice(trimmed.length);
+                      return (
+                        <span key={i}>
+                          <a
+                            href={trimmed}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline text-red-300 hover:text-red-200 break-all"
+                          >
+                            {trimmed}
+                          </a>
+                          {trailing}
+                        </span>
+                      );
+                    }
+                    return <span key={i}>{piece}</span>;
+                  })}
                 </div>
               )}
               {originTxHash && phase === 'filling' && (
