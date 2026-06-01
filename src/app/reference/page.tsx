@@ -487,13 +487,15 @@ function AsyncPattern() {
         minimum acceptable output token: resolvers cannot fill below it.
       </p>
       <p className="text-cream-300 leading-relaxed mb-5">
-        Note for smart-wallet users: on Coinbase Smart Wallet, Safe, Argent, ZeroDev, or any
-        EIP-5792-capable account, the USDC OP approval and Across deposit can be batched into
-        a single prompt via <code className="inline-code">wallet_sendCalls</code>, collapsing
-        the flow to effectively one user interaction (the bundled OP-side batch, then the
-        Ethereum-side Fusion signature). The PoC ships the Level 1 sequential path that works
-        with vanilla EOAs today; the Level 2 smart-wallet batching is a drop-in upgrade behind
-        a <code className="inline-code">wallet_getCapabilities</code> feature detection.
+        Note for smart-wallet and EIP-7702 users: on Coinbase Smart Wallet, Safe, Argent,
+        ZeroDev, any other EIP-5792-capable smart account, or any EOA that has delegated to a
+        7702-compatible implementation (MetaMask post-Pectra, Rabby, and a growing list), the
+        USDC OP approval and Across deposit can be batched into a single prompt via{' '}
+        <code className="inline-code">wallet_sendCalls</code>, collapsing the flow to
+        effectively one user interaction (the bundled OP-side batch, then the Ethereum-side
+        Fusion signature). The PoC ships the Level 1 sequential path that works with vanilla
+        EOAs today; the Level 2 batched path is a drop-in upgrade behind a{' '}
+        <code className="inline-code">wallet_getCapabilities</code> feature detection.
       </p>
 
       {/* SDK install + package callout - engineers want exact npm command */}
@@ -666,16 +668,20 @@ GET https://api.1inch.dev/fusion/orders/v2.0/{chainId}/order/status/{orderHash}
         <div className="space-y-3 mb-3">
           <div className="rounded-xl bg-bg-800/40 border border-white/[0.04] p-3.5">
             <div className="text-[11px] font-semibold text-cream-100 mb-1.5">
-              Level 2 &middot; smart-wallet batching via EIP-5792
+              Level 2 &middot; EIP-5792 batching (smart wallets + EIP-7702 EOAs)
             </div>
             <p className="text-xs text-cream-400 leading-relaxed">
-              Coinbase Smart Wallet, Safe, Argent, ZeroDev, and other EIP-5792-capable accounts
-              expose <code className="inline-code">wallet_sendCalls</code> to batch multiple
-              operations into a single prompt. The USDC OP approval + Across deposit collapse
-              into one user-side batch on Optimism; the Fusion order signature follows on
-              Ethereum. Feature-detect via{' '}
+              Two account types expose <code className="inline-code">wallet_sendCalls</code> to
+              batch multiple operations into a single prompt: native smart accounts (Coinbase
+              Smart Wallet, Safe, Argent, ZeroDev) and EIP-7702-delegating EOAs (MetaMask
+              post-Pectra, Rabby, and a fast-growing list). The USDC OP approval + Across
+              deposit collapse into one user-side batch on Optimism; the Fusion order
+              signature follows on Ethereum. Feature-detect via{' '}
               <code className="inline-code">wallet_getCapabilities</code> and fall back to
-              Level 1 for vanilla EOAs. Drop-in upgrade, no contract changes.
+              Level 1 for vanilla EOAs. Drop-in upgrade, no contract changes &mdash; and
+              EIP-7702 means ether.fi doesn&rsquo;t need a full smart-account product to
+              benefit; the existing EOA user base picks it up the moment their wallet
+              supports it.
             </p>
           </div>
           <div className="rounded-xl bg-bg-800/40 border border-white/[0.04] p-3.5">

@@ -1046,7 +1046,9 @@ export default function CashDemo() {
                           back-to-back upfront, then Across delivers USDC and resolvers fill via
                           Dutch auction. Two signatures.{' '}
                           <span className="text-cream-500">
-                            Smart-wallet accounts (Coinbase Smart Wallet, Safe, Argent) collapse this to a single prompt via EIP-5792.
+                            Smart-wallet accounts (Coinbase Smart Wallet, Safe, Argent) or
+                            EIP-7702-enabled EOAs (MetaMask post-Pectra, Rabby, others) collapse
+                            this to a single prompt via EIP-5792.
                           </span>
                         </>
                       ) : (
