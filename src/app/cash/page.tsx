@@ -638,13 +638,20 @@ export default function CashDemo() {
         const estUsdcEth = (raw * 997n) / 1000n;
 
         // --------- Step 1: USDC ETH -> 1inch Router approval (one-time) ---------
-        // On-demand allowance read via publicClient. The wagmi useReadContract
-        // hook (fusionEthRouterAllowance above) can return undefined while still
-        // loading. Reading it here at click-time gives a definitive answer and
-        // prevents firing an unnecessary approval prompt when the on-chain
-        // allowance is already sufficient.
+        // Layered allowance resolution to kill the false-positive approval prompt:
+        //   1. Wagmi useReadContract hook value if populated (most common case
+        //      once the page has been open >1s).
+        //   2. On-demand publicClient read at click-time (covers hard-refresh +
+        //      immediate click before the hook populates).
+        //   3. Fall back to 0n only if both layers fail.
+        // Verbose console logging so any false-positive prompt can be diagnosed
+        // from the browser console.
         let liveEthAllowance: bigint = 0n;
-        if (ethPublicClient) {
+        let ethAllowanceSource = 'init-zero';
+        if (fusionEthRouterAllowance !== undefined) {
+          liveEthAllowance = fusionEthRouterAllowance as bigint;
+          ethAllowanceSource = 'wagmi-hook';
+        } else if (ethPublicClient) {
           try {
             liveEthAllowance = (await ethPublicClient.readContract({
               address: USDC_ETH_ADDR,
@@ -652,13 +659,19 @@ export default function CashDemo() {
               functionName: 'allowance',
               args: [address as `0x${string}`, ONEINCH_ROUTER_V6_ETH],
             })) as bigint;
-          } catch {
-            // On read failure, treat as 0 to force the approval prompt — safer
-            // than skipping (a missing approval would cause the Fusion fill to
-            // revert; an extra approval just costs gas).
+            ethAllowanceSource = 'public-client';
+          } catch (err) {
+            console.error('[fusion] ETH allowance publicClient read failed:', err);
             liveEthAllowance = 0n;
+            ethAllowanceSource = 'public-client-error';
           }
         }
+        console.log('[fusion] ETH allowance check:', {
+          source: ethAllowanceSource,
+          liveEthAllowance: liveEthAllowance.toString(),
+          estUsdcEth: estUsdcEth.toString(),
+          willApprove: liveEthAllowance < estUsdcEth,
+        });
         if (liveEthAllowance < estUsdcEth) {
           if (chainId !== ethChain) await switchChain({ chainId: ethChain });
           setPhase('fusion-approving-usdc');
@@ -674,10 +687,13 @@ export default function CashDemo() {
         }
 
         // --------- Step 2: USDC OP -> SpokePool approval (one-time) ---------
-        // Mirror Step 1: on-demand read via opPublicClient to avoid the same
-        // wagmi useReadContract loading-race firing an unnecessary OP approval.
+        // Same layered pattern as Step 1: wagmi hook -> publicClient -> 0n.
         let liveOpAllowance: bigint = 0n;
-        if (opPublicClient) {
+        let opAllowanceSource = 'init-zero';
+        if (fusionOpSpokeAllowance !== undefined) {
+          liveOpAllowance = fusionOpSpokeAllowance as bigint;
+          opAllowanceSource = 'wagmi-hook';
+        } else if (opPublicClient) {
           try {
             liveOpAllowance = (await opPublicClient.readContract({
               address: ORIGIN_USDC.address as `0x${string}`,
@@ -685,10 +701,19 @@ export default function CashDemo() {
               functionName: 'allowance',
               args: [address as `0x${string}`, SPOKE_POOL_OP],
             })) as bigint;
-          } catch {
+            opAllowanceSource = 'public-client';
+          } catch (err) {
+            console.error('[fusion] OP allowance publicClient read failed:', err);
             liveOpAllowance = 0n;
+            opAllowanceSource = 'public-client-error';
           }
         }
+        console.log('[fusion] OP allowance check:', {
+          source: opAllowanceSource,
+          liveOpAllowance: liveOpAllowance.toString(),
+          raw: raw.toString(),
+          willApprove: liveOpAllowance < raw,
+        });
         if (liveOpAllowance < raw) {
           if (chainId !== opChain) await switchChain({ chainId: opChain });
           setPhase('approving');
