@@ -743,91 +743,19 @@ export default function CashDemo() {
           message: buildResp.typedData.message as Record<string, unknown>,
         });
 
-        // Both signatures captured. From here on, no user interaction.
-        // --------- Step 4 (async): wait for Across to deliver USDC ---------
-        setPhase('fusion-bridging');
-
-        // Extract depositId from the receipt for reliable polling. Across's
-        // status endpoint indexes by depositId; tx-hash lookups can lag.
-        // SpokePool emits FundsDeposited / V3FundsDeposited with depositId as
-        // the second indexed param (topics[2]). We pick the SpokePool log
-        // whose topics[2] decodes to a "small" integer (real depositIds are
-        // sequential counters in the low millions, not 32-byte hashes).
-        let depositId: string | null = null;
-        let depositIdSkipReason: string | null = null;
-        try {
-          if (!opPublicClient) {
-            depositIdSkipReason = 'no public client for chain 10';
-          } else {
-            const receipt = await opPublicClient.waitForTransactionReceipt({
-              hash: depositTxHash,
-              timeout: 30_000,
-            });
-            const spokeLower = SPOKE_POOL_OP.toLowerCase();
-            let sawSpokeLog = false;
-            for (const log of receipt.logs) {
-              if (log.address.toLowerCase() !== spokeLower) continue;
-              if (log.topics.length < 3) continue;
-              sawSpokeLog = true;
-              const topic2 = log.topics[2];
-              if (!topic2) continue;
-              const asBigInt = BigInt(topic2);
-              // depositId is a sequential counter (well under 2^53). Anything
-              // larger is probably a different event (e.g. FilledRelay where
-              // topics[2] is a relay hash).
-              if (asBigInt > 0n && asBigInt < (1n << 53n)) {
-                depositId = asBigInt.toString();
-                break;
-              }
-            }
-            if (!depositId) {
-              depositIdSkipReason = sawSpokeLog
-                ? 'SpokePool log topic[2] not depositId-shaped'
-                : 'no SpokePool log in receipt';
-            }
-          }
-        } catch (e) {
-          depositIdSkipReason = `receipt parse failed: ${e instanceof Error ? e.message.slice(0, 80) : String(e).slice(0, 80)}`;
-          console.warn('[fusion] could not extract depositId from receipt:', e);
-        }
-
-        // Poll Across status. Use depositId primarily (more reliable), fall
-        // back to depositTxHash if we couldn't extract the ID. 4-minute
-        // timeout gives generous safety margin over the typical ~2s fill.
-        const startBridge = Date.now();
-        const BRIDGE_TIMEOUT_MS = 240_000;
-        let arrived = false;
-        while (Date.now() - startBridge < BRIDGE_TIMEOUT_MS) {
-          await new Promise((r) => setTimeout(r, 3000));
-          try {
-            const params = new URLSearchParams({ originChainId: String(opChain) });
-            if (depositId) params.set('depositId', depositId);
-            else params.set('depositTxHash', depositTxHash);
-            const r = await fetch(`/api/status?${params.toString()}`, { cache: 'no-store' });
-            if (r.ok) {
-              const j = await r.json();
-              if (j?.status === 'filled' || j?.fillTx || j?.fillTxHash) {
-                setFillTxHash(j.fillTx || j.fillTxHash || null);
-                arrived = true;
-                break;
-              }
-            }
-          } catch {}
-        }
-        if (!arrived) {
-          // Recoverable: USDC may still arrive any minute. Surface diagnostic
-          // info so the user can verify on Etherscan and we can debug if needed.
-          const idStatus = depositId
-            ? `depositId ${depositId}`
-            : `depositId unavailable (${depositIdSkipReason ?? 'unknown reason'})`;
-          throw new Error(
-            `Across delivery hasn\u2019t shown as filled after 4 minutes. ${idStatus}. ` +
-            `Verify on Optimistic Etherscan: https://optimistic.etherscan.io/tx/${depositTxHash}. ` +
-            `If the deposit arrived, the Fusion order is already signed and will be submitted on next attempt.`,
-          );
-        }
-
-        // --------- Step 5: Submit the pre-signed Fusion order to relayer ---------
+        // --------- Step 4: Submit signed order to 1inch IMMEDIATELY ---------
+        // Submit BEFORE polling for Across delivery. This is the key
+        // robustness move: by submitting upfront, the order lives in 1inch's
+        // system regardless of what happens to our browser session. If the
+        // page refreshes, if our polling fails, if Across's indexer lags --
+        // the order is already in the relayer's hands and resolvers will
+        // fill it as soon as USDC arrives at the maker's wallet.
+        //
+        // The Fusion 'fast' preset has startAuctionIn=60s, meaning resolvers
+        // wait 60 seconds before attempting fills. Across typically delivers
+        // in ~2-4s, so by the time the auction starts, USDC has already
+        // landed in the user's wallet. If Across is slower, the auction
+        // window (180s) gives more buffer.
         setPhase('fusion-submitting');
         const submitResp = await fetch('/api/fusion-submit', {
           method: 'POST',
@@ -843,9 +771,69 @@ export default function CashDemo() {
         if (submitResp.error) throw new Error(submitResp.error);
         setFusionOrderHash(buildResp.orderHash);
 
-        // --------- Step 6: Poll Fusion order status ---------
+        // Both signatures captured AND order submitted. From here on,
+        // the trade lives in 1inch's system independent of our session.
+        // --------- Step 5 (headless): wait for Across to deliver + resolver to fill ---------
+        setPhase('fusion-bridging');
+
+        // Extract depositId from the receipt for reliable status display.
+        // SpokePool emits FundsDeposited with depositId as topics[2].
+        let depositId: string | null = null;
+        let depositIdSkipReason: string | null = null;
+        try {
+          if (!opPublicClient) {
+            depositIdSkipReason = 'no public client for chain 10';
+          } else {
+            const receipt = await opPublicClient.waitForTransactionReceipt({
+              hash: depositTxHash,
+              timeout: 30_000,
+            });
+            // If the deposit tx reverted on-chain, status will be 'reverted'.
+            // That's recoverable from the user's perspective: we already
+            // submitted the Fusion order, but no USDC will arrive, so the
+            // order will expire. Surface clearly.
+            if (receipt.status === 'reverted') {
+              throw new Error(
+                `Across deposit transaction reverted on-chain. The Fusion order is in 1inch\u2019s system but no USDC will be bridged to fill it; the order will expire unfilled. ` +
+                `Verify on Optimistic Etherscan: https://optimistic.etherscan.io/tx/${depositTxHash}. ` +
+                `Common cause: stale USDC allowance to the SpokePool. Try Bebop or 1inch Aggregation for a known-good atomic route.`,
+              );
+            }
+            const spokeLower = SPOKE_POOL_OP.toLowerCase();
+            let sawSpokeLog = false;
+            for (const log of receipt.logs) {
+              if (log.address.toLowerCase() !== spokeLower) continue;
+              if (log.topics.length < 3) continue;
+              sawSpokeLog = true;
+              const topic2 = log.topics[2];
+              if (!topic2) continue;
+              const asBigInt = BigInt(topic2);
+              if (asBigInt > 0n && asBigInt < (1n << 53n)) {
+                depositId = asBigInt.toString();
+                break;
+              }
+            }
+            if (!depositId) {
+              depositIdSkipReason = sawSpokeLog
+                ? 'SpokePool log topic[2] not depositId-shaped'
+                : 'no SpokePool log in receipt';
+            }
+          }
+        } catch (e) {
+          // If we already threw the "reverted" error, re-throw it.
+          if (e instanceof Error && e.message.includes('reverted on-chain')) throw e;
+          depositIdSkipReason = `receipt parse failed: ${e instanceof Error ? e.message.slice(0, 80) : String(e).slice(0, 80)}`;
+          console.warn('[fusion] could not extract depositId from receipt:', e);
+        }
+
+        // Poll FUSION order status directly. This is the authoritative
+        // outcome signal: if the order fills, Across must have delivered.
+        // If the order expires, the trade failed (whether due to Across
+        // delivery failure, no resolver coverage, or auction price
+        // exhaustion is secondary; the result is the same).
         setPhase('fusion-auction');
         const startAuction = Date.now();
+        const FUSION_TIMEOUT_MS = 420_000; // 7 min: 60s start + 180s auction + buffer
         const pollFusion = async () => {
           try {
             const r = await fetch(
@@ -858,13 +846,30 @@ export default function CashDemo() {
               setPhase('fusion-filled');
               return;
             }
-            if (j?.status === 'expired' || j?.status === 'cancelled') {
+            if (j?.status === 'expired' || j?.status === 'cancelled' || j?.status === 'false-predicate') {
               setPhase('fusion-expired');
+              setError(
+                `Fusion order ${j.status}. Order hash: ${buildResp.orderHash}. ` +
+                (depositId
+                  ? `Across deposit (id ${depositId}): https://optimistic.etherscan.io/tx/${depositTxHash}`
+                  : `Verify Across deposit: https://optimistic.etherscan.io/tx/${depositTxHash}` +
+                    (depositIdSkipReason ? ` (depositId unavailable: ${depositIdSkipReason})` : '')),
+              );
               return;
             }
           } catch {}
-          // Max ~6 minutes of polling (Dutch auction max is typically 3min)
-          if (Date.now() - startAuction < 360_000) setTimeout(pollFusion, 3000);
+          if (Date.now() - startAuction < FUSION_TIMEOUT_MS) {
+            setTimeout(pollFusion, 3000);
+          } else {
+            // 7-min ceiling: order may still fill but we stop tracking
+            setError(
+              `Order still pending after 7 minutes. The order is in 1inch\u2019s system and may still fill. ` +
+              `Order hash: ${buildResp.orderHash}. ` +
+              `Verify Across deposit: https://optimistic.etherscan.io/tx/${depositTxHash}` +
+              (depositId ? ` (depositId ${depositId})` : ''),
+            );
+            setPhase('error');
+          }
         };
         setTimeout(pollFusion, 2000);
         return;

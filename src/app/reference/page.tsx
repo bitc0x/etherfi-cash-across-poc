@@ -569,13 +569,20 @@ function AsyncPattern() {
           <li className="flex gap-3">
             <span className="text-gold-300 font-mono tabular flex-shrink-0">5</span>
             <span>
-              <span className="text-cream-100 font-semibold">Headless: bridge then submit then fill.</span>{' '}
-              Poll <code className="inline-code">/api/deposit/status</code> until USDC arrives
-              on Ethereum (~2&ndash;4s), POST the pre-signed order to 1inch&rsquo;s relayer via{' '}
-              <code className="inline-code">/api/fusion-submit</code>, then poll{' '}
-              <code className="inline-code">/api/fusion-status</code> until the resolver fills
-              (typical 30s&ndash;3min during liquid market conditions). Output token settles
-              into the user&rsquo;s wallet on Ethereum. UI shows &ldquo;Bridging and
+              <span className="text-cream-100 font-semibold">Submit the signed order first, then bridge and fill in parallel.</span>{' '}
+              POST the freshly signed order to 1inch&rsquo;s relayer via{' '}
+              <code className="inline-code">/api/fusion-submit</code>{' '}
+              <span className="text-cream-100">immediately</span> after sig 2 resolves &mdash;{' '}
+              before any bridge polling. The order&rsquo;s{' '}
+              <code className="inline-code">startAuctionIn = 60s</code> means resolvers wait
+              60 seconds before attempting fills, which is the buffer that lets Across
+              deliver USDC (~2&ndash;4s typical) before the Dutch auction opens. The
+              order lives in 1inch&rsquo;s order book from this moment on, decoupled from
+              the browser session: if the page refreshes, if the bridge poll fails, if
+              the indexer lags, the relayer is already holding the order and will fill
+              it when USDC arrives. After submission, poll{' '}
+              <code className="inline-code">/api/fusion-status</code> until the order
+              settles (filled, expired, or cancelled). UI shows &ldquo;Bridging and
               filling...&rdquo; throughout.
             </span>
           </li>
