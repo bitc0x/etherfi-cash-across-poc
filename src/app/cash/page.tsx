@@ -153,7 +153,7 @@ function formatFeeUsd(inputUsd: number, feePct: number): string {
 export default function CashDemo() {
   const { address, isConnected } = useAccount();
   const chainId = useChainId();
-  const { switchChain } = useSwitchChain();
+  const { switchChain, switchChainAsync } = useSwitchChain();
   const { sendTransactionAsync } = useSendTransaction();
   // Optimism public client for parsing the Across deposit receipt (V3FundsDeposited
   // event), so we can extract depositId and poll Across's status endpoint by ID.
@@ -786,10 +786,18 @@ export default function CashDemo() {
 
         // --------- SIGNATURE 2 of 2: Fusion EIP-712 order on Ethereum ---------
         // Fires immediately after sig 1 resolves. No polling / no wait between.
-        // The chain switch to Ethereum is silent on most wallets when the chain
-        // is already known (it's just a context change for the typed-data
-        // signature; no on-chain action).
-        if (chainId !== ethChain) await switchChain({ chainId: ethChain });
+        // Use switchChainAsync (NOT switchChain) here because signTypedDataAsync
+        // does not have an explicit chainId parameter — wagmi cannot enforce
+        // the chain context internally the way it does for sendTransactionAsync.
+        // The sync switchChain() is fire-and-forget; awaiting it is a no-op, so
+        // the signing call can fire while the wallet is still on the previous
+        // chain. Some wallets (Brave/UMA Hot Wallet observed) refuse to sign
+        // typed-data whose domain.chainId differs from the wallet's current
+        // chain, returning a generic JSON-RPC "internal error" response.
+        // switchChainAsync returns a Promise that resolves only when the chain
+        // switch actually completes, guaranteeing wallet is on chainId 1 before
+        // the signature request fires.
+        if (chainId !== ethChain) await switchChainAsync({ chainId: ethChain });
         setPhase('fusion-confirm-order');
         // Strip EIP712Domain from types - wagmi/viem add it internally and
         // including it explicitly causes a duplicate-type error in some wallets.
