@@ -644,13 +644,9 @@ export default function CashDemo() {
         //   2. On-demand publicClient read at click-time (covers hard-refresh +
         //      immediate click before the hook populates).
         //   3. Fall back to 0n only if both layers fail.
-        // Verbose console logging so any false-positive prompt can be diagnosed
-        // from the browser console.
         let liveEthAllowance: bigint = 0n;
-        let ethAllowanceSource = 'init-zero';
         if (fusionEthRouterAllowance !== undefined) {
           liveEthAllowance = fusionEthRouterAllowance as bigint;
-          ethAllowanceSource = 'wagmi-hook';
         } else if (ethPublicClient) {
           try {
             liveEthAllowance = (await ethPublicClient.readContract({
@@ -659,19 +655,11 @@ export default function CashDemo() {
               functionName: 'allowance',
               args: [address as `0x${string}`, ONEINCH_ROUTER_V6_ETH],
             })) as bigint;
-            ethAllowanceSource = 'public-client';
           } catch (err) {
             console.error('[fusion] ETH allowance publicClient read failed:', err);
             liveEthAllowance = 0n;
-            ethAllowanceSource = 'public-client-error';
           }
         }
-        console.log('[fusion] ETH allowance check:', {
-          source: ethAllowanceSource,
-          liveEthAllowance: liveEthAllowance.toString(),
-          estUsdcEth: estUsdcEth.toString(),
-          willApprove: liveEthAllowance < estUsdcEth,
-        });
         if (liveEthAllowance < estUsdcEth) {
           if (chainId !== ethChain) await switchChain({ chainId: ethChain });
           setPhase('fusion-approving-usdc');
@@ -689,10 +677,8 @@ export default function CashDemo() {
         // --------- Step 2: USDC OP -> SpokePool approval (one-time) ---------
         // Same layered pattern as Step 1: wagmi hook -> publicClient -> 0n.
         let liveOpAllowance: bigint = 0n;
-        let opAllowanceSource = 'init-zero';
         if (fusionOpSpokeAllowance !== undefined) {
           liveOpAllowance = fusionOpSpokeAllowance as bigint;
-          opAllowanceSource = 'wagmi-hook';
         } else if (opPublicClient) {
           try {
             liveOpAllowance = (await opPublicClient.readContract({
@@ -701,19 +687,11 @@ export default function CashDemo() {
               functionName: 'allowance',
               args: [address as `0x${string}`, SPOKE_POOL_OP],
             })) as bigint;
-            opAllowanceSource = 'public-client';
           } catch (err) {
             console.error('[fusion] OP allowance publicClient read failed:', err);
             liveOpAllowance = 0n;
-            opAllowanceSource = 'public-client-error';
           }
         }
-        console.log('[fusion] OP allowance check:', {
-          source: opAllowanceSource,
-          liveOpAllowance: liveOpAllowance.toString(),
-          raw: raw.toString(),
-          willApprove: liveOpAllowance < raw,
-        });
         if (liveOpAllowance < raw) {
           if (chainId !== opChain) await switchChain({ chainId: opChain });
           setPhase('approving');
