@@ -876,6 +876,44 @@ export default function CashDemo() {
           console.warn('[fusion] could not extract depositId from receipt:', e);
         }
 
+        // ============================================================
+        // Fire-and-forget: register with the async-order tracking layer.
+        // ============================================================
+        // At this point, both legs of the Fusion path have succeeded:
+        //   1. Across deposit tx is mined (waitForTransactionReceipt resolved)
+        //   2. Fusion order was accepted by 1inch (we'd have thrown at line 821
+        //      otherwise)
+        //   3. depositId is extracted from the receipt (or null with reason)
+        //
+        // Behavior is bounded for safety:
+        //   - URL is read from NEXT_PUBLIC_TRACKING_URL. Missing/empty → skip,
+        //     PoC behaves identically to today.
+        //   - depositId is required by the tracking layer's contract; if our
+        //     local extraction failed we skip rather than send a 400-bound body.
+        //   - No `await`. The fetch promise is intentionally orphaned — the
+        //     user's success card renders identically whether this resolves,
+        //     rejects, or hangs.
+        //   - .catch uses console.debug (invisible by default, ignored by
+        //     Sentry-class monitors, but available if a dev opens DevTools to
+        //     diagnose schema drift between this client and the tracking API).
+        const trackingUrl = process.env.NEXT_PUBLIC_TRACKING_URL;
+        if (trackingUrl && depositId && address) {
+          fetch(`${trackingUrl}/api/order/submit`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              strategy: 'fusion-same-chain',
+              orderHash: buildResp.orderHash,
+              originChainId: opChain,
+              destinationChainId: ethChain,
+              depositId,
+              depositTxHash,
+              userAddress: address,
+              expectedDeliveryAmount: buildResp.order.takingAmount,
+            }),
+          }).catch((e) => console.debug('[tracking] submit failed:', e));
+        }
+
         // Poll FUSION order status directly. This is the authoritative
         // outcome signal: if the order fills, Across must have delivered.
         // If the order expires, the trade failed (whether due to Across
