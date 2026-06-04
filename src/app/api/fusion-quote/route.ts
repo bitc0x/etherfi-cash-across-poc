@@ -28,6 +28,40 @@ function bigintSafeReplacer(_key: string, value: unknown): unknown {
   return typeof value === 'bigint' ? value.toString() : value;
 }
 
+// US equity market hours gate (Eastern Time, Mon-Fri 9:30 - 16:00). Used to
+// short-circuit Fusion quotes off-hours where 1inch's submit endpoint will
+// reject even though their quote endpoint now responds successfully. The
+// UI already keys on `marketHoursIssue` to surface the offline notice and
+// disable submit; this gate ensures it fires reliably instead of depending
+// on the brittle upstream-error pattern matching in the catch block below.
+//
+// Holidays (Thanksgiving, Christmas, Good Friday, etc.) are NOT handled
+// here — would require a fixed list to maintain. The heuristic in the
+// catch block below remains as a backstop for those days, since 1inch is
+// likely to error on quotes when there's no resolver coverage at all.
+//
+// Implementation note: Intl.DateTimeFormat with timeZone is the only
+// reliable way to compute ET wall-clock time on a UTC-defaulted Vercel
+// server. Round-tripping via toLocaleString into a Date constructor is
+// fragile across Node versions.
+function isWithinUSMarketHours(now: Date = new Date()): boolean {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/New_York',
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(now);
+  const weekday = parts.find((p) => p.type === 'weekday')?.value;
+  if (weekday === 'Sat' || weekday === 'Sun') return false;
+  const hour = parseInt(parts.find((p) => p.type === 'hour')?.value ?? '0', 10);
+  const minute = parseInt(parts.find((p) => p.type === 'minute')?.value ?? '0', 10);
+  const minutes = hour * 60 + minute;
+  // 9:30 inclusive, 16:00 exclusive. At exactly 16:00 ET, after-hours begins
+  // and resolvers wind down; at exactly 9:30 ET, the cash session opens.
+  return minutes >= 9 * 60 + 30 && minutes < 16 * 60;
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const fromTokenAddress = searchParams.get('fromTokenAddress');
@@ -43,6 +77,30 @@ export async function GET(req: NextRequest) {
           'missing required params: fromTokenAddress, toTokenAddress, amount, walletAddress',
       },
       { status: 400 },
+    );
+  }
+
+  // Off-hours short-circuit. As of June 2026, 1inch's quote endpoint returns
+  // successful quotes outside US market hours but their submit endpoint still
+  // rejects with 400 — leaving users who get this far signing, broadcasting
+  // the Across deposit, then having the Fusion submit fail. The result: USDC
+  // stranded on Ethereum with no destination order, exactly the scenario the
+  // tracking layer is built to surface.
+  //
+  // The legacy `marketHoursIssue` heuristic in the catch block below only
+  // fires when the quote itself errors, which it no longer does. Keep both
+  // gates as defense in depth: this clock check covers the common case,
+  // the heuristic still catches holidays and unscheduled outages.
+  if (!isWithinUSMarketHours()) {
+    return NextResponse.json(
+      {
+        error: 'fusion quote unavailable: outside US market hours',
+        marketHoursIssue: true,
+        statusCode: null,
+        detail:
+          'US equity market hours are Mon-Fri 9:30 AM - 4:00 PM ET. Use Bebop RFQ or 1inch Aggregation for atomic routing in the meantime.',
+      },
+      { status: 502 },
     );
   }
 
