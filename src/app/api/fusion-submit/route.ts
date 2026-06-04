@@ -72,9 +72,46 @@ export async function POST(req: NextRequest) {
       { headers: { 'Cache-Control': 'no-store' } },
     );
   } catch (e: unknown) {
+    // Surface what 1inch actually rejected. The Fusion SDK wraps axios errors;
+    // the upstream response body lives at e.response.data and is exactly what
+    // 1inch's relayer wrote into the 400/5xx body. Without exposing it, the
+    // client sees only "Request failed with status code 400" from axios's
+    // default message, which is uselessly generic for diagnosing rejected
+    // submits (sub-economic order, predicate mismatch, balance check, etc.).
+    //
+    // Defense: cap the upstream payload at 2KB to avoid leaking unexpected
+    // large blobs. The structure 1inch returns is small JSON; 2KB is plenty.
+    const eAny = e as Record<string, unknown>;
+    const response = eAny?.response as Record<string, unknown> | undefined;
+    const upstreamStatus =
+      typeof response?.status === 'number' ? (response.status as number) : null;
+    const upstreamData = response?.data ?? null;
+    let upstreamSnippet: string | null = null;
+    try {
+      const s = typeof upstreamData === 'string' ? upstreamData : JSON.stringify(upstreamData);
+      upstreamSnippet = s ? s.slice(0, 2048) : null;
+    } catch {
+      upstreamSnippet = '[unserializable upstream body]';
+    }
+
     const msg = e instanceof Error ? e.message : 'fusion submit failed';
+
+    // Server-side log: visible in Vercel runtime logs. orderHash included so
+    // we can correlate to client-side reports.
+    console.error('[fusion-submit] upstream error:', {
+      msg,
+      upstreamStatus,
+      upstreamSnippet,
+      orderHash,
+    });
+
     return NextResponse.json(
-      { error: 'fusion submit failed', detail: msg.slice(0, 500) },
+      {
+        error: 'fusion submit failed',
+        detail: msg.slice(0, 500),
+        upstreamStatus,
+        upstream: upstreamData ?? null,
+      },
       { status: 502 },
     );
   }
