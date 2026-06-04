@@ -793,19 +793,81 @@ export default function CashDemo() {
           message: buildResp.typedData.message as Record<string, unknown>,
         });
 
-        // --------- Step 4: Submit signed order to 1inch IMMEDIATELY ---------
-        // Submit BEFORE polling for Across delivery. This is the key
-        // robustness move: by submitting upfront, the order lives in 1inch's
-        // system regardless of what happens to our browser session. If the
-        // page refreshes, if our polling fails, if Across's indexer lags --
-        // the order is already in the relayer's hands and resolvers will
-        // fill it as soon as USDC arrives at the maker's wallet.
+        // --------- Step 4: Wait for Across to deliver USDC on Ethereum ---------
+        // 1inch's Fusion order book runs a server-side pre-flight check at
+        // submit time: does the maker (this wallet) currently hold makerAsset
+        // (USDC) on the destination chain AND has it approved the v6
+        // Aggregation Router to spend it? If either is false, the submit is
+        // rejected with `ORDER_SAVER_ERROR` / `NotEnoughBalanceOrAllowance`
+        // and the order never enters the book — resolvers never see it.
         //
-        // The Fusion 'fast' preset has startAuctionIn=60s, meaning resolvers
-        // wait 60 seconds before attempting fills. Across typically delivers
-        // in ~2-4s, so by the time the auction starts, USDC has already
-        // landed in the user's wallet. If Across is slower, the auction
-        // window (180s) gives more buffer.
+        // The previous "submit immediately after broadcast" ordering loses
+        // this race deterministically: at T+~1s after the Across deposit tx
+        // broadcasts, USDC is still in flight from Optimism. The maker's
+        // Ethereum balance is 0 (or only residual from a prior test). 1inch
+        // checks, sees nothing, refuses to save the order. By T+5-15s when
+        // Across actually delivers, no auction was ever scheduled. The
+        // user's USDC arrives in their wallet but no fill happens. Reproduced
+        // 3x on June 4 (8:35 / 9:52 / 11:04 ET), upstream body confirmed
+        // verbatim on the third attempt thanks to the PR #3 logging.
+        //
+        // The Fusion order's `deadline` (set inside the typed-data we just
+        // signed) is 3-5 min by default. The bridge wait below is bounded at
+        // 120s; Across typically delivers in 2-15s on the OP -> ETH route.
+        // Plenty of headroom — the signed order is comfortably valid by the
+        // time we submit it.
+        setPhase('fusion-bridging');
+        const bridgeStart = Date.now();
+        const BRIDGE_TIMEOUT_MS = 120_000;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        let lastBridgeStatus: any = null;
+        while (Date.now() - bridgeStart < BRIDGE_TIMEOUT_MS) {
+          try {
+            const r = await fetch(
+              `/api/status?originChainId=${opChain}&depositTxHash=${depositTxHash}`,
+              { cache: 'no-store' },
+            );
+            if (r.ok) {
+              const j = await r.json();
+              lastBridgeStatus = j;
+              if (j?.status === 'filled' || j?.fillTx || j?.fillTxHash) {
+                break;
+              }
+              if (j?.status === 'expired' || j?.status === 'refunded') {
+                throw new Error(
+                  `Across deposit ${j.status} before delivery. The Fusion order was signed but not submitted ` +
+                  `(no 1inch order book entry, nothing to fill). Verify on Optimistic Etherscan: ` +
+                  `https://optimistic.etherscan.io/tx/${depositTxHash}.`,
+                );
+              }
+            }
+          } catch (e) {
+            // Network blip — keep polling. If it persists for 2 min the
+            // outer timeout below will fire and surface a clear error.
+            if (e instanceof Error && e.message.includes('Across deposit')) throw e;
+          }
+          await new Promise((res) => setTimeout(res, 2500));
+        }
+        if (
+          !(
+            lastBridgeStatus?.status === 'filled' ||
+            lastBridgeStatus?.fillTx ||
+            lastBridgeStatus?.fillTxHash
+          )
+        ) {
+          throw new Error(
+            `Across delivery timed out after 2 minutes. The Fusion order was signed but not submitted ` +
+            `to 1inch (no order book entry, no resolver fee). If USDC eventually lands on Ethereum it ` +
+            `stays in your wallet and you can retry. Deposit tx: ` +
+            `https://optimistic.etherscan.io/tx/${depositTxHash}.`,
+          );
+        }
+
+        // --------- Step 5: Submit signed order to 1inch (now safe) ---------
+        // Across has delivered USDC to the maker's Ethereum wallet. 1inch's
+        // pre-flight balance + allowance check will now pass and the order
+        // will be saved to the auction book. From here the existing fill
+        // polling loop takes over.
         setPhase('fusion-submitting');
         const submitResp = await fetch('/api/fusion-submit', {
           method: 'POST',
@@ -821,10 +883,13 @@ export default function CashDemo() {
         if (submitResp.error) throw new Error(submitResp.error);
         setFusionOrderHash(buildResp.orderHash);
 
-        // Both signatures captured AND order submitted. From here on,
-        // the trade lives in 1inch's system independent of our session.
-        // --------- Step 5 (headless): wait for Across to deliver + resolver to fill ---------
-        setPhase('fusion-bridging');
+        // Both signatures captured, Across has delivered, AND order submitted.
+        // From here on, the trade lives in 1inch's system independent of our
+        // session. Next we extract depositId for the tracking-layer fire-and-
+        // forget (Phase B) registration, then enter the fusion-auction polling
+        // loop. No need to setPhase('fusion-bridging') here — that happened
+        // earlier (before the bridge-wait poll) and bridging is now complete.
+        // --------- Step 6 (headless): wait for resolver fill via Fusion auction ---------
 
         // Extract depositId from the receipt for reliable status display.
         // SpokePool emits FundsDeposited with depositId as topics[2].
@@ -1670,7 +1735,7 @@ export default function CashDemo() {
                   {phase === 'fusion-preparing' && 'Preparing your order...'}
                   {phase === 'fusion-confirm-bridge' && 'Step 1 of 2: Confirm cross-chain transfer'}
                   {phase === 'fusion-confirm-order' && 'Step 2 of 2: Sign purchase order'}
-                  {phase === 'fusion-bridging' && 'Bridging and filling...'}
+                  {phase === 'fusion-bridging' && 'Bridging USDC to Ethereum...'}
                   {phase === 'fusion-submitting' && 'Submitting to 1inch relayer...'}
                   {phase === 'fusion-auction' && `Resolver competing on Dutch auction...`}
                   {(phase === 'idle' || phase === 'quoted' || phase === 'error') &&
