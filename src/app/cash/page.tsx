@@ -111,8 +111,8 @@ type Phase =
   // back-to-back, then async wait for Across delivery, then submit signed order.
   | 'fusion-approving-usdc'   // Pre-flight USDC -> Aggregation Router allowance (one-time)
   | 'fusion-preparing'        // Fetching /api/swap + building Fusion order upfront
-  | 'fusion-confirm-bridge'   // Step 1 of 2: user signs Across depositV3 on Optimism
-  | 'fusion-confirm-order'    // Step 2 of 2: user signs EIP-712 Fusion order on Ethereum
+  | 'fusion-confirm-order'    // Step 1 of 2: user signs EIP-712 Fusion order on Ethereum
+  | 'fusion-confirm-bridge'   // Step 2 of 2: user signs Across depositV3 on Optimism
   | 'fusion-bridging'         // Across in flight; both sigs already captured. No user action.
   | 'fusion-bridged'          // (legacy, retained for back-compat; no longer set)
   | 'fusion-signing-order'    // (legacy, retained for back-compat; replaced by fusion-confirm-order)
@@ -751,31 +751,39 @@ export default function CashDemo() {
           throw new Error(buildResp.error || 'fusion order build failed');
         }
 
-        // --------- SIGNATURE 1 of 2: Across deposit on Optimism ---------
-        if (chainId !== opChain) await switchChain({ chainId: opChain });
-        setPhase('fusion-confirm-bridge');
-        const depositTxHash = await sendTransactionAsync({
-          chainId: opChain,
-          to: swapResp.swapTx.to as `0x${string}`,
-          data: swapResp.swapTx.data as `0x${string}`,
-          value: BigInt(swapResp.swapTx.value || '0'),
-        });
-        setOriginTxHash(depositTxHash);
-
-        // --------- SIGNATURE 2 of 2: Fusion EIP-712 order on Ethereum ---------
-        // Fires immediately after sig 1 resolves. No polling / no wait between.
-        // Use switchChainAsync (NOT switchChain) here because signTypedDataAsync
-        // does not have an explicit chainId parameter — wagmi cannot enforce
-        // the chain context internally the way it does for sendTransactionAsync.
-        // The sync switchChain() is fire-and-forget; awaiting it is a no-op, so
-        // the signing call can fire while the wallet is still on the previous
-        // chain. Some wallets (Brave/UMA Hot Wallet observed) refuse to sign
-        // typed-data whose domain.chainId differs from the wallet's current
-        // chain, returning a generic JSON-RPC "internal error" response.
-        // switchChainAsync returns a Promise that resolves only when the chain
-        // switch actually completes, guaranteeing wallet is on chainId 1 before
-        // the signature request fires.
-        if (chainId !== ethChain) await switchChainAsync({ chainId: ethChain });
+        // --------- STEP 1 of 2: Sign Fusion EIP-712 order on Ethereum FIRST ---------
+        // Reordered (was: broadcast Across first, sign Fusion second). The old
+        // order created a wallet-side race:
+        //   1. Broadcast Across deposit on Optimism (USDC leaves OP wallet)
+        //   2. Switch chain from OP -> ETH
+        //   3. Request typed-data signature
+        //
+        // Some wallets (UMA Hot Wallet / Brave observed June 4 2026 11:29 ET)
+        // return JSON-RPC -32603 "An internal error was received" at step 3
+        // when the chain hasn't actually finished propagating to the wallet's
+        // signing context, even after switchChainAsync resolves. The wallet
+        // refuses to sign typed-data whose domain.chainId differs from the
+        // wallet's connected chain. The dApp can't reliably observe this
+        // race without polling the wallet directly.
+        //
+        // With the new order:
+        //   1. Switch chain to ETH (clean state, no prior tx queued)
+        //   2. Request typed-data signature (still on ETH, no race possible)
+        //   3. Switch chain to OP
+        //   4. Broadcast Across deposit
+        //
+        // Failure safety: if step 2 fails (wallet refuses to sign), NO USDC
+        // has been committed. The user can retry or abandon with zero loss.
+        // Previously, a step-3 failure left the deposit broadcast already on
+        // OP — USDC bridged but no Fusion order in the book. That's how
+        // Victor lost 9 USDC on the 11:29 ET test.
+        //
+        // Unconditional switchChainAsync (no `if (chainId !== ethChain)`):
+        // wagmi's `chainId` hook can lag the actual wallet state. Calling
+        // switchChainAsync when already on the target chain is a fast no-op
+        // in the wagmi v2 + viem stack; the conditional gate was strictly
+        // less safe.
+        await switchChainAsync({ chainId: ethChain });
         setPhase('fusion-confirm-order');
         // Strip EIP712Domain from types - wagmi/viem add it internally and
         // including it explicitly causes a duplicate-type error in some wallets.
@@ -792,6 +800,21 @@ export default function CashDemo() {
           primaryType: buildResp.typedData.primaryType as 'Order',
           message: buildResp.typedData.message as Record<string, unknown>,
         });
+
+        // --------- STEP 2 of 2: Broadcast Across deposit on Optimism ---------
+        // Fusion order is signed and persisted in `signature` above. Now and
+        // only now do we commit funds. If the user rejects the broadcast,
+        // the signed order has a 3-5 min deadline and will simply expire —
+        // no USDC consumed, no on-chain state, clean abandonment.
+        await switchChainAsync({ chainId: opChain });
+        setPhase('fusion-confirm-bridge');
+        const depositTxHash = await sendTransactionAsync({
+          chainId: opChain,
+          to: swapResp.swapTx.to as `0x${string}`,
+          data: swapResp.swapTx.data as `0x${string}`,
+          value: BigInt(swapResp.swapTx.value || '0'),
+        });
+        setOriginTxHash(depositTxHash);
 
         // --------- Step 4: Wait for Across to deliver USDC on Ethereum ---------
         // 1inch's Fusion order book runs a server-side pre-flight check at
@@ -1733,8 +1756,8 @@ export default function CashDemo() {
                   {/* Fusion-specific phase labels (Option A Level 1 sequential UX) */}
                   {phase === 'fusion-approving-usdc' && 'Approving USDC for 1inch Router...'}
                   {phase === 'fusion-preparing' && 'Preparing your order...'}
-                  {phase === 'fusion-confirm-bridge' && 'Step 1 of 2: Confirm cross-chain transfer'}
-                  {phase === 'fusion-confirm-order' && 'Step 2 of 2: Sign purchase order'}
+                  {phase === 'fusion-confirm-order' && 'Step 1 of 2: Sign purchase order'}
+                  {phase === 'fusion-confirm-bridge' && 'Step 2 of 2: Confirm cross-chain transfer'}
                   {phase === 'fusion-bridging' && 'Bridging USDC to Ethereum...'}
                   {phase === 'fusion-submitting' && 'Submitting to 1inch relayer...'}
                   {phase === 'fusion-auction' && `Resolver competing on Dutch auction...`}
