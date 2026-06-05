@@ -804,7 +804,16 @@ GET https://api.1inch.dev/fusion/orders/v2.0/{chainId}/order/status/{orderHash}
               <code className="inline-code">fillContractOrder</code> entry point (OrderMixin),
               which is the ERC-1271 path. Requires the integrator&rsquo;s Safe to implement
               ERC-1271 order validation. Bigger lift, single-prompt UX for every wallet. Designed,
-              not yet built.
+              not yet built. For a full implementation guide, see the{' '}
+              <a
+                href="https://github.com/bitc0x/etherfi-cash-across-poc/blob/main/docs/PATTERN_B_IMPLEMENTATION_GUIDE.md"
+                target="_blank"
+                rel="noreferrer"
+                className="text-cream-100 underline"
+              >
+                Pattern B Implementation Guide
+              </a>
+              .
             </p>
           </div>
         </div>
