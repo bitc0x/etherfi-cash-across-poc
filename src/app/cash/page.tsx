@@ -1647,7 +1647,7 @@ export default function CashDemo() {
                     })()}
                   </div>
                 </div>
-                <span className="px-2 py-0.5 rounded-full bg-purple-400/15 border border-purple-400/30 text-purple-200 font-semibold text-[10px] tracking-wider flex-shrink-0">
+                <span className="px-2 py-0.5 rounded-full bg-violet-400/15 border border-violet-400/30 text-violet-300 font-semibold text-[10px] tracking-wider flex-shrink-0">
                   DUTCH AUCTION
                 </span>
               </div>

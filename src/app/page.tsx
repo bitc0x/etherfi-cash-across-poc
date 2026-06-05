@@ -1003,8 +1003,9 @@ function Credentials() {
         ether.fi's production credentials.
       </h2>
       <p className="text-cream-300 max-w-3xl mb-14 leading-relaxed">
-        Pre-provisioned by the Across team for ether.fi. Use these in any environment, from local
-        builds to production deployments. Volume attributes back to ether.fi automatically.{' '}
+        Pre-provisioned by the Across team for ether.fi. The integrator ID attributes volume to
+        ether.fi automatically on every Swap API call; the dedicated API key is shared privately
+        and lives in the server environment, never in the client.{' '}
         <a
           href="https://docs.across.to"
           target="_blank"
@@ -1023,8 +1024,8 @@ function Credentials() {
         />
         <CredCard
           label="API Key"
-          value="acx_oVArKo8JzULZIcCJfTDjr6B7ab9J0yM2"
-          description="Pass as a Bearer token in the Authorization header."
+          value="acx_••••••••••••••  ·  shared privately"
+          description="Passed as a Bearer token in the Authorization header, server-side only. The full key is delivered to the ether.fi team directly, never embedded in this page or the client bundle."
         />
       </div>
     </section>

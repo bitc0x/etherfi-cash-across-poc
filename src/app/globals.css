@@ -141,11 +141,11 @@ input[type=number] { -moz-appearance: textfield; }
 .inline-code {
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   font-size: 0.85em;
-  background: rgba(212, 175, 55, 0.08);
+  background: rgba(200, 168, 118, 0.08);
   color: var(--gold);
   padding: 1px 6px;
   border-radius: 4px;
-  border: 1px solid rgba(212, 175, 55, 0.15);
+  border: 1px solid rgba(200, 168, 118, 0.15);
   word-break: break-all;
 }
 
