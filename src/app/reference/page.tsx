@@ -184,7 +184,7 @@ function IntegratorProfile() {
     [
       'Min-out guaranteed',
       <>
-        Encoded in Fusion&rsquo;s <code className="inline-code">takingAmount</code> &mdash; a
+        Encoded in Fusion&rsquo;s <code className="inline-code">takingAmount</code>; a
         resolver cannot fill below it without reverting at the LOP. For the atomic paths, the
         slippage tolerance in the swap calldata enforces the same floor.
       </>,
@@ -794,7 +794,7 @@ GET https://api.1inch.dev/fusion/orders/v2.0/{chainId}/order/status/{orderHash}
           </div>
           <div className="rounded-xl bg-bg-800/40 border border-white/[0.04] p-3.5">
             <div className="text-[11px] font-semibold text-cream-100 mb-1.5">
-              Pattern B &middot; single-signature Fusion via ERC-1271 (designed, not yet built &middot; ~1&ndash;2 weeks integrator-side)
+              Pattern B &middot; single-signature Fusion via ERC-1271 (designed, not yet built &middot; ~1-2 weeks integrator-side)
             </div>
             <p className="text-xs text-cream-400 leading-relaxed">
               The integrator&rsquo;s Safe (or smart account) acts as the Fusion maker itself,
