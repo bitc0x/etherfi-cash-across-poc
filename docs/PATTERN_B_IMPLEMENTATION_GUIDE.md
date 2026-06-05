@@ -242,9 +242,10 @@ Sequence:
 
 **Reuse from existing infrastructure**:
 
-- Turnkey signing (already in place for user keys)
+- Turnkey signing (already in place for user keys). Turnkey natively supports raw EIP-712 typed-data signing (their [blog post](https://www.turnkey.com/blog/smarter-off-chain-flows-eip-712) covers it explicitly; same primitive they expose for Uniswap Permit, ERC-3009, and Hyperliquid orders). The user signs our Intent struct via a standard Turnkey signing call, no custom Turnkey integration required.
 - Existing ether.fi Safe contract framework (if it supports custom storage and validation logic, Pattern B Safes are a thin extension)
 - Existing backend services for transaction submission (if the Cash UX keeper exists, it can be extended)
+- Optional intent-validation at the Turnkey layer: Turnkey's policy engine can be configured to validate the intent structure before the signature is produced (e.g., enforce minOutputAmount floors, restrict recipient to the user's own wallet, cap expiry to a max window). This is an additional defense-in-depth layer on top of the OriginSafe + DestSafe Solidity validation. Not required for the architecture to work, but worth considering for production hardening.
 
 **Build new**:
 
@@ -257,7 +258,6 @@ Sequence:
 ## Open questions to align on with us
 
 - Does ether.fi's existing Safe support arbitrary owner-authorized storage writes? If yes, we extend it; if not, this needs a new contract.
-- Turnkey's signing surface: does it produce raw EIP-712 signatures, or are there constraints we need to design around?
 - One keeper service for both chains, or separate? Hot-wallet management implications.
 - 1inch resolver whitelist: can ether.fi's DestSafe address get whitelisted by 1inch's resolver fleet, or is a contract-maker filter not in play? Worth confirming with 1inch BD before Phase 1 spends gas.
 

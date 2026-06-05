@@ -3,6 +3,7 @@
 ## [unreleased]
 
 ### Docs
+- Updated Pattern B page: removed the Turnkey signing-surface open question (confirmed natively supported per Turnkey's EIP-712 blog post), added an optional Turnkey policy-engine layer note.
 - Final QA pass before the ether.fi share: scrubbed the remaining em dashes from code
   comments (repo is now fully dash-free, including comments); corrected metadataBase to the
   live production domain so shared-link social previews resolve; made the cash banner
