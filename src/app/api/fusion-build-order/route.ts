@@ -77,6 +77,10 @@ export async function POST(req: NextRequest) {
   };
 
   try {
+    // ether.fi requires no partial fills on the destination swap leg. The
+    // Across leg already enforces this by design; Fusion does not by default,
+    // so we explicitly disable both flags at order construction. allowMultipleFills
+    // is also off because multiple fills imply partial fills.
     const prepared = await sdk.createOrder({
       fromTokenAddress,
       toTokenAddress,
@@ -84,6 +88,8 @@ export async function POST(req: NextRequest) {
       walletAddress,
       preset: preset ? presetMap[preset] : PresetEnum.fast,
       source,
+      allowPartialFills: false,
+      allowMultipleFills: false,
       ...(receiver ? { receiver } : {}),
     });
 

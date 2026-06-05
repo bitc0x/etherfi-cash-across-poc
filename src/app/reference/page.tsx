@@ -460,7 +460,13 @@ function AsyncPattern() {
         user&rsquo;s Ethereum wallet</span> &mdash; no embedded action needed. The Fusion order
         then settles independently once USDC has arrived. Min output is enforced inside the
         order&rsquo;s <code className="inline-code">auctionEndAmount</code>: resolvers cannot
-        fill below it.
+        fill below it. Partial and multiple fills are{' '}
+        <span className="text-cream-100">disabled at order construction</span> (
+        <code className="inline-code">allowPartialFills: false</code>,{' '}
+        <code className="inline-code">allowMultipleFills: false</code>) to match ether.fi&rsquo;s
+        no-partial-fills requirement on the destination swap leg &mdash; the resolver either
+        fills the entire <code className="inline-code">makingAmount</code> in one shot, or the
+        order expires unfilled.
       </p>
       <p className="text-cream-300 leading-relaxed mb-5">
         This is two user signatures total: one for the Across deposit transaction on Optimism,
@@ -543,7 +549,10 @@ function AsyncPattern() {
               <code className="inline-code">recipient = user&rsquo;s Ethereum wallet</code> and{' '}
               <code className="inline-code">no actions[]</code>, then call{' '}
               <code className="inline-code">sdk.createOrder()</code> with{' '}
-              <code className="inline-code">amount = swapResp.minOutputAmount</code>. The SDK
+              <code className="inline-code">amount = swapResp.minOutputAmount</code>,{' '}
+              <code className="inline-code">allowPartialFills: false</code>, and{' '}
+              <code className="inline-code">allowMultipleFills: false</code> &mdash; ether.fi
+              requires no partial fills on the destination swap leg. The SDK
               returns the EIP-712 typed data plus encoded extension bytes (auction parameters,
               whitelisted resolvers, fee config).
             </span>
@@ -617,7 +626,8 @@ GET https://api.1inch.dev/fusion/orders/v2.0/{chainId}/order/status/{orderHash}
   orderHash = sdk.createOrder(...).getOrderHash(1)
 
 # Returns: { status, fills[], settlement, makingAmount, takingAmount, ... }
-# status transitions: pending -> partially-filled -> filled, or expired, or refunded`}</pre>
+# status transitions: pending -> filled, or expired, or refunded
+# (no partially-filled: the PoC sets allowPartialFills=false, allowMultipleFills=false)`}</pre>
         <p className="text-[11px] text-cream-400 leading-snug">
           The PoC wraps both endpoints in server-side Next.js routes (
           <code className="inline-code">/api/status</code> and{' '}
