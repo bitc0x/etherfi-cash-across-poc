@@ -595,6 +595,30 @@ function AsyncPattern() {
         <code className="inline-code">wallet_getCapabilities</code> feature detection.
       </p>
 
+      <div className="rounded-2xl border border-gold-500/20 bg-gold-500/[0.04] p-5 mb-7">
+        <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-2">
+          Async order tracking
+        </div>
+        <p className="text-sm text-cream-300 leading-relaxed mb-3">
+          Because the Fusion fill settles after Across delivers USDC, the async order states that
+          matter to the user (pending, destination filled, and refund handling for orders that
+          expire unfilled) are surfaced by a dedicated order tracking layer. The PoC submits each
+          Fusion order to it and tracks the orderHash from{' '}
+          <code className="inline-code">pending</code> to{' '}
+          <code className="inline-code">destination_filled</code>, so refunds and unfilled orders
+          are visible rather than silent. This is the async-states-and-refunds surface for
+          intent-based fills.
+        </p>
+        <a
+          href="https://across-order-tracking.vercel.app/"
+          target="_blank"
+          rel="noreferrer"
+          className="btn-outline-gold text-sm inline-block"
+        >
+          Open the order tracking layer &rarr;
+        </a>
+      </div>
+
       {/* SDK install + package callout - engineers want exact npm command */}
       <div className="rounded-xl border border-white/[0.05] bg-bg-700/40 p-4 mb-7">
         <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-2">
