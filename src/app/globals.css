@@ -162,3 +162,60 @@ input[type=number] { -moz-appearance: textfield; }
   white-space: pre;
   margin: 0;
 }
+
+/* Pattern B guide page: markdown rendered on-brand */
+.md-guide { color: var(--text-cream); }
+.md-guide > :first-child { margin-top: 0; }
+.md-guide h1 {
+  font-family: 'Cormorant Garamond', 'EB Garamond', Georgia, serif;
+  color: var(--gold);
+  font-size: 2.75rem;
+  line-height: 1.05;
+  letter-spacing: -0.04em;
+  margin: 0 0 1.25rem;
+}
+.md-guide h2 {
+  font-family: 'Cormorant Garamond', 'EB Garamond', Georgia, serif;
+  color: var(--gold);
+  font-size: 1.95rem;
+  letter-spacing: -0.02em;
+  margin: 2.75rem 0 1rem;
+  padding-top: 1.75rem;
+  border-top: 1px solid var(--border);
+}
+.md-guide h3 { color: var(--text); font-size: 1.1rem; font-weight: 600; margin: 1.75rem 0 0.75rem; }
+.md-guide p { color: var(--text-muted); line-height: 1.7; margin: 0 0 1rem; }
+.md-guide strong { color: var(--text); font-weight: 600; }
+.md-guide a { color: var(--gold); text-decoration: underline; text-underline-offset: 2px; }
+.md-guide a:hover { color: var(--gold-bright); }
+.md-guide ul, .md-guide ol { color: var(--text-cream); margin: 0 0 1.25rem; padding-left: 1.4rem; }
+.md-guide ul { list-style: disc; }
+.md-guide ol { list-style: decimal; }
+.md-guide li { margin: 0.4rem 0; line-height: 1.6; }
+.md-guide code {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.85em;
+  background: rgba(200, 168, 118, 0.08);
+  color: var(--gold);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(200, 168, 118, 0.15);
+}
+.md-guide pre {
+  font-family: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+  line-height: 1.65;
+  background: var(--bg-elev-2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 1.25rem 1.5rem;
+  overflow-x: auto;
+  color: var(--text-cream);
+  margin: 0 0 1.5rem;
+}
+.md-guide pre code { background: none; border: none; color: inherit; padding: 0; font-size: inherit; white-space: pre; }
+.md-guide table { width: 100%; border-collapse: collapse; margin: 0 0 1.5rem; font-size: 0.9rem; }
+.md-guide th, .md-guide td { border: 1px solid var(--border); padding: 0.6rem 0.85rem; text-align: left; vertical-align: top; }
+.md-guide th { color: var(--gold); font-weight: 600; background: var(--bg-elev-2); }
+.md-guide td { color: var(--text-muted); }
+.md-guide hr { border: none; height: 1px; background: var(--border-strong); margin: 2rem 0; }
