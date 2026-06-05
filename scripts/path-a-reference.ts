@@ -54,16 +54,17 @@ const MULTICALL_HANDLER_ETH = '0x924a9f036260DdD5808007E1AA95f08eD08aA569';
 // is returned dynamically in bebopQuote.tx.to. We use that rather than hardcoding,
 // in case Bebop updates the routing for specific token pairs.
 
-// Seven Bebop-buyable Ondo GM tickers as of May 2026. To find more,
-// query Bebop's /pmm/ethereum/v3/tokens endpoint.
+// Seven Bebop-buyable Ondo GM tickers as of May 2026. Addresses match the
+// live PoC's token registry (src/lib/tokens.ts), verified against Bebop's
+// tokenlist. To find more, query Bebop's /pmm/ethereum/v3/tokens endpoint.
 const ONDO_GM_TOKENS = {
   TSLAon: '0xf6b1117ec07684D3958caD8BEb1b302bfD21103f',
-  NVDAon: '0xE49C5141eB67BA3D74A78c2A6De35e9eB1ad5BB7',
-  GOOGLon: '0xA2eb9aA0e0aCa05cA02ff8ab09a5dD0E20Fa39EE',
-  COINon: '0xA1eb52f1B8e1b29B26B68dC9d8FEa3a99c5b5E29',
-  HOODon: '0x4D11d0bF6dB0e4B1a1abE0c81D81DD0F70ed7e6c',
-  MSTRon: '0xfC91Ec7CE0e6B9B5AaBFA9b0Cd23F3a3F7E2A8F4',
-  CRCLon: '0x6BfAbF2C56b3aDfae3E1AAa19f4C5DcA98c75E89',
+  NVDAon: '0x2D1F7226Bd1F780AF6B9A49DCC0aE00E8Df4bDEE',
+  GOOGLon: '0xbA47214eDd2bb43099611b208f75E4b42FDcfEDc',
+  COINon: '0xF042cfa86cf1D598a75Bdb55c3507a1F39f9493b',
+  HOODon: '0x998f02A9E343EF6E3E6f28700d5A20F839fD74E6',
+  MSTRon: '0xCabD955322dfbf94C084929ac5E9Eca3fEB5556F',
+  CRCLon: '0x3632DEa96A953C11dac2f00b4A05a32CD1063fAE',
 } as const;
 
 const BUY_TOKEN = ONDO_GM_TOKENS.TSLAon;

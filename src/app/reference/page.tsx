@@ -578,21 +578,23 @@ function AsyncPattern() {
           <li className="flex gap-3">
             <span className="text-gold-300 font-mono tabular flex-shrink-0">5</span>
             <span>
-              <span className="text-cream-100 font-semibold">Submit the signed order first, then bridge and fill in parallel.</span>{' '}
-              POST the freshly signed order to 1inch&rsquo;s relayer via{' '}
-              <code className="inline-code">/api/fusion-submit</code>{' '}
-              <span className="text-cream-100">immediately</span> after sig 2 resolves &mdash;{' '}
-              before any bridge polling. The order&rsquo;s{' '}
-              <code className="inline-code">startAuctionIn = 60s</code> means resolvers wait
-              60 seconds before attempting fills, which is the buffer that lets Across
-              deliver USDC (~2&ndash;4s typical) before the Dutch auction opens. The
-              order lives in 1inch&rsquo;s order book from this moment on, decoupled from
-              the browser session: if the page refreshes, if the bridge poll fails, if
-              the indexer lags, the relayer is already holding the order and will fill
-              it when USDC arrives. After submission, poll{' '}
-              <code className="inline-code">/api/fusion-status</code> until the order
-              settles (filled, expired, or cancelled). UI shows &ldquo;Bridging and
-              filling...&rdquo; throughout.
+              <span className="text-cream-100 font-semibold">Wait for Across to deliver USDC, then submit the signed order.</span>{' '}
+              Poll <code className="inline-code">/api/status</code> until the Across deposit
+              fills and USDC lands in the user&rsquo;s Ethereum wallet (~2&ndash;15s typical on
+              this route; the PoC bounds the wait at 120s). <span className="text-cream-100">Only
+              then</span> POST the signed order to 1inch&rsquo;s relayer via{' '}
+              <code className="inline-code">/api/fusion-submit</code>. Order matters: 1inch runs a
+              server-side pre-flight at submit time checking that the maker already holds{' '}
+              <code className="inline-code">makerAsset</code> (USDC) and has approved the v6
+              router. Submitting <span className="text-cream-100">before</span> delivery loses
+              that check deterministically &mdash; the maker&rsquo;s balance is still 0, 1inch
+              refuses to save the order, no auction is ever scheduled, and the USDC arrives with
+              nothing to fill it. The signed order&rsquo;s deadline (minutes) comfortably outlives
+              the bridge wait, so submitting after delivery is always in time. After submission,
+              poll <code className="inline-code">/api/fusion-status</code> until the order settles
+              (filled, expired, or cancelled). UI shows &ldquo;Bridging USDC&hellip;&rdquo; then
+              &ldquo;Submitting&hellip;&rdquo; then &ldquo;Resolver competing on Dutch
+              auction&hellip;&rdquo;.
             </span>
           </li>
         </ol>
@@ -604,12 +606,15 @@ function AsyncPattern() {
         </div>
         <p className="text-sm text-cream-300 leading-relaxed mb-3">
           Two independent legs, two status streams. The PoC polls each on its own clock and
-          drives the UI off a phase enum (<code className="inline-code">bridging</code> &rarr;{' '}
-          <code className="inline-code">bridged</code> &rarr;{' '}
-          <code className="inline-code">signing-order</code> &rarr;{' '}
+          drives the UI off a phase enum (<code className="inline-code">confirm-bridge</code> &rarr;{' '}
+          <code className="inline-code">confirm-order</code> &rarr;{' '}
+          <code className="inline-code">bridging</code> &rarr;{' '}
           <code className="inline-code">submitting</code> &rarr;{' '}
           <code className="inline-code">auction</code> &rarr;{' '}
-          <code className="inline-code">filled</code>).
+          <code className="inline-code">filled</code>). The two signatures are captured upfront
+          (<code className="inline-code">confirm-bridge</code>,{' '}
+          <code className="inline-code">confirm-order</code>); the bridge wait, submit, and fill
+          run headless after.
         </p>
         <pre className="code-block !mb-3">{`# Across bridge leg (poll every 2-3s until status is "filled")
 GET https://app.across.to/api/deposit/status
