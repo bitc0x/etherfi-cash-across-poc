@@ -1237,7 +1237,7 @@ export default function CashDemo() {
                 </div>
                 <p className="text-xs text-cream-400 mt-1">
                   {mode === 'buy'
-                    ? 'Spend USDC from your Cash safe on any Ethereum asset. One signature, ~2s settlement.'
+                    ? 'Spend USDC from your Cash safe on any Ethereum asset. Atomic routes settle in one signature, ~2s; Fusion is async, two signatures today.'
                     : 'Sell an Ethereum-side position back into USDC on your Cash safe. Same flow, reversed.'}
                 </p>
               </div>
@@ -2009,9 +2009,10 @@ function DemoBanner() {
       <div className="text-sm leading-relaxed">
         <span className="font-semibold gold-text">Live PoC.</span>{' '}
         <span className="text-cream-200">
-          Opens with TSLAon (Ondo&rsquo;s tokenized Tesla). User signs once and declares min
-          output, Across delivers USDC to Ethereum, and the destination action completes the
-          trade. For TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, CRCLon a three-way{' '}
+          Opens with TSLAon (Ondo&rsquo;s tokenized Tesla). The user declares min output and
+          Across delivers USDC to Ethereum; on the atomic routes the destination swap completes
+          inside the same fill (one signature), while 1inch Fusion fills as a separate Ethereum
+          order (two signatures today). For TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, CRCLon a three-way{' '}
           <span className="text-cream-50 font-semibold">destination liquidity toggle</span>{' '}
           appears next to the trade form: Bebop RFQ (atomic, zero slippage), 1inch Aggregation
           (atomic, multi-DEX; for Ondo GM typically routes via Bebop as a PMM), or 1inch
