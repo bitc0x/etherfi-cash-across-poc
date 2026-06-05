@@ -296,7 +296,7 @@ function OndoStocks() {
       <p className="text-cream-300 max-w-3xl mb-12 leading-relaxed text-lg">
         Ondo Global Markets is the largest tokenized equities platform onchain.{' '}
         <span className="text-cream-100">$1.5B TVL, $18B cumulative volume, 70% market share,
-        260+ stocks and ETFs across Ethereum and BNB Chain.</span> The architecture below routes
+        260+ stocks and ETFs across Solana, Ethereum, and BNB Chain.</span> The architecture below routes
         Cash users into any supported Ondo GM token from their OP safe: Across Swap API on the
         bridge leg, then a destination fill from Bebop RFQ or 1inch Aggregation (both atomic
         embedded actions, one signature) or 1inch Fusion (a separate Ethereum order, two
