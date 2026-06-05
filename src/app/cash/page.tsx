@@ -605,6 +605,11 @@ export default function CashDemo() {
     // in the user's wallet as residual; the resolver always has enough USDC
     // to pull because actual_arrived >= minOutputAmount by Across's contract.
     //
+    // The Fusion order is constructed with allowPartialFills=false and
+    // allowMultipleFills=false (see /api/fusion-build-order). ether.fi requires
+    // no partial fills on the destination swap leg — the resolver either fills
+    // the entire makingAmount in one shot, or the order expires unfilled.
+    //
     // Note (smart wallets): for users on Coinbase Smart Wallet, Safe, Argent,
     // ZeroDev, or any EIP-5792-capable wallet, the USDC OP approval + Across
     // deposit can be batched into one prompt via wallet_sendCalls, collapsing
@@ -615,7 +620,8 @@ export default function CashDemo() {
     //   1. (optional) Approve USDC ETH -> 1inch Aggregation Router (one-time per user)
     //   2. (optional) Approve USDC OP  -> Across SpokePool         (one-time per user)
     //   3. Fetch /api/swap (Across deposit calldata + minOutputAmount)
-    //   4. Build Fusion order via SDK against minOutputAmount
+    //   4. Build Fusion order via SDK against minOutputAmount (single-fill only:
+    //      allowPartialFills=false, allowMultipleFills=false)
     //   5. SIGNATURE 1 of 2: sendTransaction(swapTx) on Optimism
     //   6. SIGNATURE 2 of 2: signTypedData(Fusion order) on Ethereum   <-- back-to-back
     //   7. Poll /api/status until USDC arrives on Ethereum (no user action)
