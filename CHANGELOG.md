@@ -2,6 +2,13 @@
 
 ## [unreleased]
 
+### Docs alignment
+- Aligned landing and cash page copy with the current PoC state: the single-signature /
+  MulticallHandler framing is now scoped to the atomic paths (Bebop, 1inch Aggregation), with
+  the async Fusion path (two signatures today, USDC delivered to the user wallet) called out
+  explicitly. Added an "Integrator Requirements Profile" section to the reference and marked
+  Pattern B (single-signature Fusion via ERC-1271) as designed, not yet built.
+
 ### Destination liquidity
 - Three destination sources wired and selectable per trade for Bebop-buyable Ondo GM stocks:
   Bebop RFQ (atomic, zero slippage), 1inch Aggregation (atomic, multi-DEX), and 1inch Fusion

@@ -81,16 +81,17 @@ function Hero() {
       </h2>
       <p className="text-lg text-cream-300 max-w-3xl mb-10 leading-relaxed">
         Cash holds USDC on Optimism. TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, CRCLon and
-        the wider Ondo Global Markets family live on Ethereum. The user signs once in Cash and
-        declares the minimum acceptable output. Across delivers USDC to Ethereum and executes
-        whatever destination action completes the trade in the same transaction.{' '}
+        the wider Ondo Global Markets family live on Ethereum. The user declares the minimum
+        acceptable output, Across delivers USDC to Ethereum, and how the trade finishes depends on
+        the route.{' '}
         <span className="text-cream-100">
           Three liquidity sources wired in the PoC today: Bebop RFQ, 1inch Aggregation, 1inch
           Fusion.
         </span>{' '}
-        ~2 seconds for atomic paths, zero slippage on RFQ fills, no vault to deploy, no Ondo
-        onboarding required. Same plumbing covers USDY, sUSDe, weETH, and anything else
-        Ethereum-only.
+        The atomic paths (Bebop, Aggregation) complete inside the Across fill in one signature, ~2
+        seconds, zero slippage on RFQ fills. The async path (Fusion) settles as a separate Ethereum
+        order, two signatures today. No vault to deploy, no Ondo onboarding required. Same plumbing
+        covers USDY, sUSDe, weETH, and anything else Ethereum-only.
       </p>
       <div className="flex flex-wrap gap-3">
         <Link href="/cash" className="btn-gold">
@@ -217,13 +218,13 @@ function Unlock() {
       n: '01',
       tag: 'Ondo stocks, first',
       h: 'TSLAon, AAPLon, NVDAon, in Cash.',
-      p: "Ondo Global Markets is the largest tokenized equity platform onchain, 260+ US stocks and ETFs live on Ethereum. ether.fi Cash users can't reach them today because Cash is on Optimism. Across closes the gap: USDC leaves the OP safe via the Swap API, settles on Ethereum at the MulticallHandler in ~2 seconds, and an embedded destination action delivers the requested Ondo GM token in the same transaction. Three sources wired and selectable per trade: Bebop RFQ (atomic, zero slippage; MMs are Ondo-approved primary holders so ether.fi inherits compliance at the MM layer), 1inch Aggregation (atomic, multi-DEX routing; for Ondo GM typically routes through Bebop as one of its PMM sources, with 1inch's routing layer as fallback and broader coverage for non-RFQ assets), and 1inch Fusion (Dutch auction, best rates during US market hours via the Ondo x 1inch partnership; off-hours falls back cleanly). Recipient is ether.fi's choice (user wallet or Cash safe). Same path covers USDY, sUSDe, weETH, USDS, and any other Ethereum-only asset.",
+      p: "Ondo Global Markets is the largest tokenized equity platform onchain, 260+ US stocks and ETFs live on Ethereum. ether.fi Cash users can't reach them today because Cash is on Optimism. Across closes the gap: USDC leaves the OP safe via the Swap API, settles on Ethereum at the MulticallHandler in ~2 seconds, and an embedded destination action delivers the requested Ondo GM token in the same transaction. Three sources wired and selectable per trade: Bebop RFQ (atomic, zero slippage; MMs are Ondo-approved primary holders so ether.fi inherits compliance at the MM layer), 1inch Aggregation (atomic, multi-DEX routing; for Ondo GM typically routes through Bebop as one of its PMM sources, with 1inch's routing layer as fallback and broader coverage for non-RFQ assets), and 1inch Fusion (Dutch auction, best rates during US market hours via the Ondo x 1inch partnership; off-hours falls back cleanly). Bebop and Aggregation run as embedded actions through the MulticallHandler, atomic inside the fill, one signature; Fusion instead delivers USDC to the user wallet and fills via a separate signed Ethereum order, two signatures today (single-signature Fusion via a smart-contract maker is designed, not yet built). Recipient is ether.fi's choice (user wallet or Cash safe). Same path covers USDY, sUSDe, weETH, USDS, and any other Ethereum-only asset.",
     },
     {
       n: '02',
-      tag: 'Single signature',
-      h: 'One tx. No manual bridge. No leaving Cash.',
-      p: 'User signs once. Across settles in roughly 2 seconds, the destination action executes atomically inside the same fill. Return leg is symmetric: user sells, USDC lands back in the OP safe. Same card, same session, same brand.',
+      tag: 'One or two signatures',
+      h: 'Atomic paths in one tx. No manual bridge. No leaving Cash.',
+      p: 'On the atomic paths (Bebop, 1inch Aggregation) the user signs once: Across settles in roughly 2 seconds and the destination swap executes atomically inside the same fill. The async path (1inch Fusion) is two signatures today, the Across deposit plus a separate Fusion order on Ethereum; single-signature Fusion via a smart-contract maker is designed, not yet built. Return leg is symmetric: user sells, USDC lands back in the OP safe. Same card, same session, same brand.',
     },
     {
       n: '03',
@@ -282,7 +283,7 @@ function OndoStocks() {
     { n: '01', t: 'USDC leaves OP', d: 'Cash safe debits via Across SpokePool. One user signature, declares min output.' },
     { n: '02', t: 'Across settles on ETH', d: 'Relayer fronts USDC to the MulticallHandler in ~2 seconds, UMA-secured.' },
     { n: '03', t: 'MulticallHandler routes', d: 'Approves the destination liquidity source and executes the swap atomically inside the same fill. Across never holds funds.' },
-    { n: '04', t: 'Destination source fills', d: 'Bebop RFQ (atomic, zero slippage on the quoted amount), 1inch Aggregation (atomic, multi-DEX; for Ondo GM typically routes through Bebop as a PMM, fallback for non-RFQ assets), or 1inch Fusion (Dutch auction, best rates during US market hours). ether.fi picks per trade.' },
+    { n: '04', t: 'Destination source fills', d: 'Bebop RFQ (atomic, zero slippage on the quoted amount) or 1inch Aggregation (atomic, multi-DEX; for Ondo GM typically routes through Bebop as a PMM, fallback for non-RFQ assets) fills inside this same MulticallHandler call. 1inch Fusion is the async exception: USDC is delivered to the user wallet and a separate signed order fills it (two signatures today). ether.fi picks per trade.' },
     { n: '\u2713', t: 'Abstracted in Cash UI', d: 'User sees TSLAon balance. Recipient is ether.fi\u2019s choice: user wallet or Cash safe. Sell path is symmetric.' },
   ];
 
@@ -296,9 +297,10 @@ function OndoStocks() {
         Ondo Global Markets is the largest tokenized equities platform onchain.{' '}
         <span className="text-cream-100">$1.5B TVL, $18B cumulative volume, 70% market share,
         260+ stocks and ETFs across Ethereum and BNB Chain.</span> The architecture below routes
-        Cash users into any supported Ondo GM token from their OP safe in one signature: Across
-        Swap API on the bridge leg, then a destination action sourced from Bebop RFQ, 1inch
-        Aggregation, or 1inch Fusion. All three are wired in the PoC and selectable per trade.
+        Cash users into any supported Ondo GM token from their OP safe: Across Swap API on the
+        bridge leg, then a destination fill from Bebop RFQ or 1inch Aggregation (both atomic
+        embedded actions, one signature) or 1inch Fusion (a separate Ethereum order, two
+        signatures today). All three are wired in the PoC and selectable per trade.
         Seven tickers are end-to-end executable today. We&rsquo;ve already run a live mainnet
         TSLAon purchase.
       </p>
@@ -341,7 +343,7 @@ function OndoStocks() {
       <div className="card-strong p-8">
         <div className="eyebrow mb-3">How a Cash user buys TSLAon</div>
         <h3 className="font-serif text-2xl md:text-3xl gold-text mb-7 max-w-2xl tracking-tight">
-          USDC on OP → TSLAon in Cash. One signature. ~2 seconds.
+          USDC on OP → TSLAon in Cash. Atomic path: one signature, ~2 seconds.
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           {arch.map((a, i) => (
@@ -404,7 +406,7 @@ function EmbeddedActions() {
     {
       i: '3',
       t: 'Action executes on Ethereum',
-      d: 'MulticallHandler runs whatever code completes the trade: Bebop RFQ, 1inch Aggregation, 1inch Fusion, a vault deposit, a Uniswap swap, any contract you point it at.',
+      d: 'MulticallHandler runs whatever code completes the trade: Bebop RFQ, 1inch Aggregation, a vault deposit, a Uniswap swap, any contract you point it at. (1inch Fusion is the async exception: it fills as a separate Ethereum order, not an embedded action.)',
     },
     {
       i: '✓',
@@ -470,9 +472,9 @@ function EmbeddedActions() {
 
 function ReturnLeg() {
   const outbound = [
-    'USDC leaves the Cash safe on OP. One signature, declares min output.',
+    'USDC leaves the Cash safe on OP. One signature on the atomic paths (Bebop, Aggregation); declares min output.',
     'Across relayer fills on Ethereum (~2s).',
-    'MulticallHandler executes the destination action atomically: Bebop RFQ, 1inch Aggregation, or 1inch Fusion. Ondo GM token delivered to recipient.',
+    'MulticallHandler executes the destination swap atomically for Bebop RFQ or 1inch Aggregation; the Ondo GM token is delivered to the recipient. 1inch Fusion fills async via a separate signed order (two signatures today) instead.',
   ];
   const inbound = [
     'User signs a sell of the Ondo GM token on Ethereum.',
@@ -625,8 +627,8 @@ function Architecture() {
 
 function PathRoadmap() {
   const pathA = [
-    'Across delivers USDC atomically to Ethereum in ~2 seconds via the Swap API. The same call executes an embedded destination action in the same transaction.',
-    'Three destination sources wired today: Bebop RFQ (atomic, zero slippage on the quoted amount, MMs are Ondo-approved primary holders), 1inch Aggregation (atomic, multi-DEX; for Ondo GM typically routes through Bebop as a PMM source, broader coverage for non-RFQ assets), 1inch Fusion (Dutch auction, best rates during US market hours via the Ondo x 1inch partnership).',
+    'Across delivers USDC to Ethereum in ~2 seconds via the Swap API. Bebop and 1inch Aggregation ride along as embedded destination actions in the same transaction (one signature, atomic). 1inch Fusion runs as a separate destination order on Ethereum (two signatures today, async); single-signature Fusion via an ERC-1271 smart-contract maker is designed, not yet built.',
+    'Three destination sources wired today: Bebop RFQ (atomic embedded action, zero slippage on the quoted amount, MMs are Ondo-approved primary holders), 1inch Aggregation (atomic embedded action, multi-DEX; for Ondo GM typically routes through Bebop as a PMM source, broader coverage for non-RFQ assets), 1inch Fusion (async order, Dutch auction, best rates during US market hours via the Ondo x 1inch partnership).',
     'ether.fi picks the source per trade. Same Across rails throughout. Toggle live in the PoC demo.',
     'Light lift on ether.fi\u2019s side. Drop the action payload into your existing Across Swap API call. Full integration reference open-sourced.',
     'Live coverage today: TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, CRCLon.',
@@ -783,8 +785,8 @@ function WhyAcross() {
       </h2>
       <p className="text-cream-300 max-w-3xl mb-14 leading-relaxed text-lg">
         Single-digit bps on Cash&rsquo;s routes, sub-2 second fills, $35B+ bridged with zero
-        exploits since launch, one signature for the entire cross-chain action. Verifiable on
-        every transaction, on-chain. The infrastructure under the cross-chain layer.
+        exploits since launch, as little as one signature for the entire cross-chain action.
+        Verifiable on every transaction, on-chain. The infrastructure under the cross-chain layer.
       </p>
 
       <div className="grid md:grid-cols-3 gap-5">

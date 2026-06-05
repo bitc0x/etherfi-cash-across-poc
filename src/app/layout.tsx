@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   metadataBase: new URL('https://etherfi-cash-across-poc.vercel.app'),
   title: 'ether.fi × Across · Ondo stocks in Cash, atomic',
   description:
-    'USDC on Optimism to TSLAon, NVDAon, GOOGLon and the wider Ondo GM family in one signature. Three destination sources wired: Bebop RFQ, 1inch Aggregation, 1inch Fusion. Mainnet-proven.',
+    'USDC on Optimism to TSLAon, NVDAon, GOOGLon and the wider Ondo GM family in one signature on atomic routes. Three destination sources wired: Bebop RFQ, 1inch Aggregation, 1inch Fusion. Mainnet-proven.',
   icons: { icon: '/etherfi-logo.png' },
   openGraph: {
     title: 'ether.fi × Across · Ondo stocks in Cash',

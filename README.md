@@ -8,12 +8,12 @@ Integration proposal and working PoC for ether.fi Cash, powered by the Across Sw
 
 ## What this is
 
-Cash users hold USDC in a safe on Optimism. The assets they want — Ondo Global Markets
-tokenized stocks (TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, CRCLon) plus live yield
-assets (USDY, sUSDe, sDAI, weETH, wstETH, USDS) — live on Ethereum. Across closes that gap in
-one user signature: it bridges USDC from Optimism to Ethereum and the requested asset is
-delivered to the recipient (user wallet or Cash safe). No ether.fi vault is deployed; the
-destination liquidity does the swap.
+Cash users hold USDC in a safe on Optimism. The assets they want live on Ethereum: Ondo Global
+Markets tokenized stocks (TSLAon, NVDAon, GOOGLon, COINon, HOODon, MSTRon, CRCLon) plus live
+yield assets (USDY, sUSDe, sDAI, weETH, wstETH, USDS). Across closes that gap: it bridges USDC
+from Optimism to Ethereum and the requested asset is delivered to the recipient (user wallet or
+Cash safe), one signature on the atomic routes, two on the async Fusion route. No ether.fi vault
+is deployed; the destination liquidity does the swap.
 
 Two execution shapes are wired:
 

@@ -26,6 +26,7 @@ export default function ReferencePage() {
       <Nav />
       <Header />
       <WhatThisIs />
+      <IntegratorProfile />
       <Flow />
       <Mapping />
       <Invariants />
@@ -76,9 +77,10 @@ function Header() {
       </h1>
       <p className="text-cream-300 max-w-3xl leading-relaxed text-lg mb-5">
         A complete integration guide for routing USDC from a Cash safe on Optimism into any
-        Ethereum-side liquidity source through the Across Swap API. The user signs once and
-        declares the minimum acceptable output; Across handles routing plus whatever destination
-        action completes the trade.
+        Ethereum-side liquidity source through the Across Swap API. The user declares the minimum
+        acceptable output and Across handles the cross-chain routing; on the atomic paths an
+        embedded action completes the trade in the same transaction (one signature), while the
+        async Fusion path settles as a separate Ethereum order (two signatures today).
       </p>
       <p className="text-cream-300 max-w-3xl leading-relaxed text-lg">
         Three sources wired in the live PoC today: <span className="text-cream-100">Bebop RFQ,
@@ -144,6 +146,90 @@ function WhatThisIs() {
             <li>&#9670; Single user signature for the entire flow</li>
           </ul>
         </div>
+      </div>
+    </section>
+  );
+}
+
+function IntegratorProfile() {
+  const items: [string, React.ReactNode][] = [
+    [
+      'Single-signature UX',
+      <>
+        Live for the atomic paths (Bebop, 1inch Aggregation) via embedded actions. For Fusion it
+        is designed as Pattern B (the integrator&rsquo;s Safe as Fusion maker via ERC-1271,
+        validating a Turnkey-signed intent) but <span className="text-cream-100">not built</span>;
+        today Fusion is two signatures. See section 07.
+      </>,
+    ],
+    [
+      'Fusion for thin-liquidity destinations',
+      <>
+        Tokenized equities (Ondo GM and similar) lack AMM spot liquidity at arbitrary size.
+        Aggregation and Bebop work for tokens with spot or PMM coverage; Fusion&rsquo;s auction
+        with off-chain resolver pricing is the only path for tokens with neither. Bebop and
+        Aggregation are <span className="text-cream-100">not substitutes</span> for Fusion on
+        those assets.
+      </>,
+    ],
+    [
+      'No partial fills',
+      <>
+        Fusion orders are constructed with{' '}
+        <code className="inline-code">allowPartialFills: false</code> and{' '}
+        <code className="inline-code">allowMultipleFills: false</code>. Across never partial-fills
+        by design.
+      </>,
+    ],
+    [
+      'Min-out guaranteed',
+      <>
+        Encoded in Fusion&rsquo;s <code className="inline-code">takingAmount</code>; a
+        resolver cannot fill below it without reverting at the LOP. For the atomic paths, the
+        slippage tolerance in the swap calldata enforces the same floor.
+      </>,
+    ],
+    [
+      'Failure recovery',
+      <>
+        The async order-tracking layer flags a failure subtype plus a{' '}
+        <code className="inline-code">recovery_action</code> (retry, bridge_back, manual); no
+        funds get stuck. If a Fusion order expires, the bridged USDC stays in the user&rsquo;s
+        Ethereum wallet. If an Across deposit goes unfilled, the native SpokePool refunds at{' '}
+        <code className="inline-code">fillDeadline</code>.
+      </>,
+    ],
+    [
+      'Smart-wallet compatible',
+      <>
+        Works with Turnkey, account-abstraction wallets, and Safes. Pattern B specifically
+        requires the integrator&rsquo;s Safe to implement ERC-1271 and validate Fusion orders
+        against the user&rsquo;s typed-data intent.
+      </>,
+    ],
+  ];
+  return (
+    <section className="max-w-5xl mx-auto px-6 py-10">
+      <div className="eyebrow mb-3">01.5 &middot; Integrator requirements profile</div>
+      <h2 className="font-serif text-3xl md:text-4xl gold-text mb-5 tracking-tightest">
+        What a production integration profile asks for.
+      </h2>
+      <p className="text-cream-300 leading-relaxed mb-7">
+        The capability set a Cash-style integration is evaluated against, and where the PoC stands
+        on each today. Honest about what is live versus designed.
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {items.map(([title, body], i) => (
+          <div key={title} className="card p-5">
+            <div className="flex items-baseline gap-2.5 mb-1.5">
+              <span className="font-serif text-lg gold-text tabular leading-none">
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <span className="font-semibold text-cream-50 text-sm">{title}</span>
+            </div>
+            <div className="text-sm text-cream-300 leading-relaxed">{body}</div>
+          </div>
+        ))}
       </div>
     </section>
   );
@@ -708,15 +794,17 @@ GET https://api.1inch.dev/fusion/orders/v2.0/{chainId}/order/status/{orderHash}
           </div>
           <div className="rounded-xl bg-bg-800/40 border border-white/[0.04] p-3.5">
             <div className="text-[11px] font-semibold text-cream-100 mb-1.5">
-              Pattern B &middot; single-signature Fusion via ERC-1271
+              Pattern B &middot; single-signature Fusion via ERC-1271 (designed, not yet built &middot; ~1-2 weeks integrator-side)
             </div>
             <p className="text-xs text-cream-400 leading-relaxed">
-              Have a custom MulticallHandler extension act as the Fusion maker itself, signing
-              orders via on-chain ERC-1271 contract signature after Across delivers USDC. The
-              user signs only the Across deposit; the handler authorizes the Fusion fill.
-              Requires a custom handler contract and resolver-side ERC-1271 acceptance
-              (supported by 1inch&rsquo;s settlement contract). Bigger lift, single-prompt UX
-              for every wallet.
+              The integrator&rsquo;s Safe (or smart account) acts as the Fusion maker itself,
+              validating the user&rsquo;s signed intent via an on-chain ERC-1271 signature after
+              Across delivers USDC. The user signs only the Across deposit; the Safe authorizes
+              the Fusion fill. Resolvers settle through 1inch LOP&rsquo;s{' '}
+              <code className="inline-code">fillContractOrder</code> entry point (OrderMixin),
+              which is the ERC-1271 path. Requires the integrator&rsquo;s Safe to implement
+              ERC-1271 order validation. Bigger lift, single-prompt UX for every wallet. Designed,
+              not yet built.
             </p>
           </div>
         </div>
