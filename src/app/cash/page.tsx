@@ -1532,6 +1532,7 @@ export default function CashDemo() {
                 opChainLogo={opChainLogo}
                 ethChainLogo={ethChainLogo}
                 onSwitchToUsdy={() => setSelectedSymbol('TSLAon')}
+                liquiditySource={liquiditySource}
               />
             ) : (
               <>
@@ -2368,6 +2369,7 @@ function StockArchitecturePreview({
   opChainLogo,
   ethChainLogo,
   onSwitchToUsdy,
+  liquiditySource,
 }: {
   symbol: string;
   underlying?: string;
@@ -2378,6 +2380,7 @@ function StockArchitecturePreview({
   opChainLogo?: string;
   ethChainLogo?: string;
   onSwitchToUsdy: () => void;
+  liquiditySource: LiquiditySource;
 }) {
   const sharePrice = STOCK_MOCK_PRICE[symbol] || 100;
   const isBuy = mode === 'buy';
@@ -2440,6 +2443,15 @@ function StockArchitecturePreview({
             </div>
           ))}
         </div>
+
+        {isBuy && liquiditySource === 'oneinch-fusion' && (
+          <div className="text-[11px] text-cream-400 mt-3 leading-relaxed">
+            Note: on the 1inch Fusion path, USDC is delivered directly to the user wallet on
+            Ethereum (not the MulticallHandler), and a separate signed Fusion order fills via 1inch
+            resolvers. Steps 02 and 03 above apply to the atomic paths (Bebop, 1inch Aggregation);
+            Fusion is the async exception.
+          </div>
+        )}
 
         {/* CTA: switch to a Bebop-buyable Ondo GM stock for live execution */}
         {isBuy && (

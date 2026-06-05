@@ -128,6 +128,14 @@ function WhatThisIs() {
         best output, drop into <code className="inline-code">actions[0]</code>. The pattern is
         identical across every source we&rsquo;ve tested.
       </p>
+      <p className="text-cream-300 leading-relaxed mb-4">
+        Note on naming: this reference uses <span className="text-cream-100">Pattern</span> for
+        signature patterns (Pattern A = two signatures, the user as Fusion maker; Pattern B = one
+        signature, the integrator Safe as Fusion maker via ERC-1271). The landing page uses{' '}
+        <span className="text-cream-100">Path</span> for roadmap phases (Path A = Across embedded
+        actions today, Path B = native Ondo in the Swap API, Path C = vault and Ondo onboarding).
+        The two axes are independent.
+      </p>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-7">
         <div className="card p-5">
           <div className="text-[10px] uppercase tracking-widest text-cream-500 mb-2">
@@ -548,14 +556,14 @@ function AsyncPattern() {
         Intent-based sources like 1inch Fusion work differently. The user signs an EIP-712 limit
         order off-chain and a whitelisted resolver fills it via a Dutch auction. Across&rsquo;s
         role is reduced to <span className="text-cream-100">reliable USDC delivery to the
-        user&rsquo;s Ethereum wallet</span> &mdash; no embedded action needed. The Fusion order
+        user&rsquo;s Ethereum wallet</span>, no embedded action needed. The Fusion order
         then settles independently once USDC has arrived. Min output is enforced inside the
         order&rsquo;s <code className="inline-code">auctionEndAmount</code>: resolvers cannot
         fill below it. Partial and multiple fills are{' '}
         <span className="text-cream-100">disabled at order construction</span> (
         <code className="inline-code">allowPartialFills: false</code>,{' '}
         <code className="inline-code">allowMultipleFills: false</code>) to match ether.fi&rsquo;s
-        no-partial-fills requirement on the destination swap leg &mdash; the resolver either
+        no-partial-fills requirement on the destination swap leg. The resolver either
         fills the entire <code className="inline-code">makingAmount</code> in one shot, or the
         order expires unfilled.
       </p>
@@ -626,8 +634,8 @@ function AsyncPattern() {
         </div>
         <pre className="code-block !mb-2">{`npm install @1inch/fusion-sdk@2`}</pre>
         <div className="text-[11px] text-cream-400 leading-snug">
-          NOT <code className="inline-code">@1inch/cross-chain-sdk</code> &mdash; that&rsquo;s
-          Fusion+ for cross-chain swaps. We don&rsquo;t need it here because Across handles the
+          NOT <code className="inline-code">@1inch/cross-chain-sdk</code> (that&rsquo;s
+          Fusion+ for cross-chain swaps). We don&rsquo;t need it here because Across handles the
           cross-chain leg and Fusion runs the Ethereum-side swap only. Used server-side in the
           PoC (kept off the client bundle) to construct the EIP-712 order from quotes; the
           client signs via viem&rsquo;s <code className="inline-code">signTypedData</code>.
@@ -666,7 +674,7 @@ function AsyncPattern() {
               <code className="inline-code">sdk.createOrder()</code> with{' '}
               <code className="inline-code">amount = swapResp.minOutputAmount</code>,{' '}
               <code className="inline-code">allowPartialFills: false</code>, and{' '}
-              <code className="inline-code">allowMultipleFills: false</code> &mdash; ether.fi
+              <code className="inline-code">allowMultipleFills: false</code>. ether.fi
               requires no partial fills on the destination swap leg. The SDK
               returns the EIP-712 typed data plus encoded extension bytes (auction parameters,
               whitelisted resolvers, fee config).
@@ -684,8 +692,8 @@ function AsyncPattern() {
             <span className="text-gold-300 font-mono tabular flex-shrink-0">4</span>
             <span>
               <span className="text-cream-100 font-semibold">Signature 2 of 2: sign the Fusion order.</span>{' '}
-              Fires <span className="text-cream-100">immediately</span> after sig 1 resolves &mdash;
-              no polling, no &ldquo;click to continue&rdquo;. Off-chain EIP-712 signature
+              Fires <span className="text-cream-100">immediately</span> after sig 1 resolves.
+              No polling, no &ldquo;click to continue&rdquo;. Off-chain EIP-712 signature
               (no gas). UI shows &ldquo;Step 2 of 2&rdquo;. From here on, no further user
               interaction.
             </span>
@@ -695,14 +703,14 @@ function AsyncPattern() {
             <span>
               <span className="text-cream-100 font-semibold">Wait for Across to deliver USDC, then submit the signed order.</span>{' '}
               Poll <code className="inline-code">/api/status</code> until the Across deposit
-              fills and USDC lands in the user&rsquo;s Ethereum wallet (~2&ndash;15s typical on
+              fills and USDC lands in the user&rsquo;s Ethereum wallet (~2-15s typical on
               this route; the PoC bounds the wait at 120s). <span className="text-cream-100">Only
               then</span> POST the signed order to 1inch&rsquo;s relayer via{' '}
               <code className="inline-code">/api/fusion-submit</code>. Order matters: 1inch runs a
               server-side pre-flight at submit time checking that the maker already holds{' '}
               <code className="inline-code">makerAsset</code> (USDC) and has approved the v6
               router. Submitting <span className="text-cream-100">before</span> delivery loses
-              that check deterministically &mdash; the maker&rsquo;s balance is still 0, 1inch
+              that check deterministically. The maker&rsquo;s balance is still 0, 1inch
               refuses to save the order, no auction is ever scheduled, and the USDC arrives with
               nothing to fill it. The signed order&rsquo;s deadline (minutes) comfortably outlives
               the bridge wait, so submitting after delivery is always in time. After submission,
@@ -762,7 +770,7 @@ GET https://api.1inch.dev/fusion/orders/v2.0/{chainId}/order/status/{orderHash}
         </div>
         <p className="text-sm text-cream-300 leading-relaxed mb-3">
           Fusion resolvers quoting Ondo GM tokens only respond during US market hours
-          (Mon&ndash;Fri 9:30&ndash;16:00 EST). Outside that window the quoter returns HTTP 500
+          (Mon-Fri 9:30-16:00 EST). Outside that window the quoter returns HTTP 500
           because resolvers can&rsquo;t hedge the underlying equity exposure when TradFi
           brokerages are closed.
         </p>
@@ -789,7 +797,7 @@ GET https://api.1inch.dev/fusion/orders/v2.0/{chainId}/order/status/{orderHash}
         <p className="text-sm text-cream-300 leading-relaxed">
           This is the structural trade-off for the Dutch auction&rsquo;s rate-discovery
           advantage. Atomic paths (Bebop, 1inch Aggregation) revert the entire deposit if the
-          destination call fails &mdash; user gets USDC back on Optimism. The async path leaves
+          destination call fails. User gets USDC back on Optimism. The async path leaves
           USDC on Ethereum if the order expires. Both are safe; they fail in different states.
         </p>
       </div>
@@ -815,7 +823,7 @@ GET https://api.1inch.dev/fusion/orders/v2.0/{chainId}/order/status/{orderHash}
               deposit collapse into one user-side batch on Optimism; the Fusion order
               signature follows on Ethereum. Feature-detect via{' '}
               <code className="inline-code">wallet_getCapabilities</code> and fall back to
-              Level 1 for vanilla EOAs. Drop-in upgrade, no contract changes &mdash; and
+              Level 1 for vanilla EOAs. Drop-in upgrade, no contract changes.
               EIP-7702 means ether.fi doesn&rsquo;t need a full smart-account product to
               benefit; the existing EOA user base picks it up the moment their wallet
               supports it.

@@ -3,6 +3,9 @@
 ## [unreleased]
 
 ### Docs
+- Scrubbed em/en dashes from reference page user-facing copy; qualified cash page buySteps
+  walkthrough for the Fusion path; added a Path vs Pattern naming disambiguation note in
+  reference section 01.
 - Added Pattern B Implementation Guide as a turnkey blueprint for integrators implementing
   single-signature Fusion via ERC-1271. Linked from the reference page Pattern B subsection.
 
