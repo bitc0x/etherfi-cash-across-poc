@@ -88,6 +88,11 @@ function Header() {
         Kyberswap, Hashflow, or a custom router. ether.fi picks the source per trade without
         ever touching the cross-chain layer.
       </p>
+      <div className="mt-8">
+        <Link href="/pattern-b" className="btn-gold inline-block">
+          Pattern B Implementation Guide &rarr;
+        </Link>
+      </div>
     </section>
   );
 }
@@ -805,14 +810,9 @@ GET https://api.1inch.dev/fusion/orders/v2.0/{chainId}/order/status/{orderHash}
               which is the ERC-1271 path. Requires the integrator&rsquo;s Safe to implement
               ERC-1271 order validation. Bigger lift, single-prompt UX for every wallet. Designed,
               not yet built. For a full implementation guide, see the{' '}
-              <a
-                href="https://github.com/bitc0x/etherfi-cash-across-poc/blob/main/docs/PATTERN_B_IMPLEMENTATION_GUIDE.md"
-                target="_blank"
-                rel="noreferrer"
-                className="text-cream-100 underline"
-              >
+              <Link href="/pattern-b" className="text-gold-400 underline">
                 Pattern B Implementation Guide
-              </a>
+              </Link>
               .
             </p>
           </div>
