@@ -2,6 +2,10 @@
 
 ## [unreleased]
 
+### Docs
+- Added Pattern B Implementation Guide as a turnkey blueprint for integrators implementing
+  single-signature Fusion via ERC-1271. Linked from the reference page Pattern B subsection.
+
 ### Docs alignment
 - Aligned landing and cash page copy with the current PoC state: the single-signature /
   MulticallHandler framing is now scoped to the atomic paths (Bebop, 1inch Aggregation), with
