@@ -3,6 +3,10 @@
 ## [unreleased]
 
 ### Docs
+- Final QA pass before the ether.fi share: scrubbed the remaining em dashes from code
+  comments (repo is now fully dash-free, including comments); corrected metadataBase to the
+  live production domain so shared-link social previews resolve; made the cash banner
+  reference link text domain-agnostic.
 - Scrubbed em/en dashes from reference page user-facing copy; qualified cash page buySteps
   walkthrough for the Fusion path; added a Path vs Pattern naming disambiguation note in
   reference section 01.

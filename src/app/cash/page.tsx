@@ -542,7 +542,7 @@ export default function CashDemo() {
   // USDC on Ethereum mainnet (Circle's FiatTokenV2.2) does support EIP-2612 permit
   // (DOMAIN_SEPARATOR + nonces verified on-chain), so a production integration
   // could include a permit signature in the Fusion order's extension instead of a
-  // separate approve. In the PoC we use a standard approve() tx for clarity —
+  // separate approve. In the PoC we use a standard approve() tx for clarity,
   // one-time per user, persists forever.
   const SPOKE_POOL_OP = '0x6f26Bf09B1C792e3228e5467807a900A503c0281' as const;
   const ONEINCH_ROUTER_V6_ETH = '0x111111125421cA6dc452d289314280a0f8842A65' as const;
@@ -587,7 +587,7 @@ export default function CashDemo() {
     setError(null);
 
     // ==============================================================
-    // BRANCH F: 1inch Fusion async path — Option A Level 1 (tight sequential UX).
+    // BRANCH F: 1inch Fusion async path, Option A Level 1 (tight sequential UX).
     //
     // Both user signatures captured BACK-TO-BACK upfront. No waiting between
     // them. After both are captured, Across delivery + Fusion submission run
@@ -607,7 +607,7 @@ export default function CashDemo() {
     //
     // The Fusion order is constructed with allowPartialFills=false and
     // allowMultipleFills=false (see /api/fusion-build-order). ether.fi requires
-    // no partial fills on the destination swap leg — the resolver either fills
+    // no partial fills on the destination swap leg, the resolver either fills
     // the entire makingAmount in one shot, or the order expires unfilled.
     //
     // Note (smart wallets): for users on Coinbase Smart Wallet, Safe, Argent,
@@ -771,7 +771,7 @@ export default function CashDemo() {
         // --------- SIGNATURE 2 of 2: Fusion EIP-712 order on Ethereum ---------
         // Fires immediately after sig 1 resolves. No polling / no wait between.
         // Use switchChainAsync (NOT switchChain) here because signTypedDataAsync
-        // does not have an explicit chainId parameter — wagmi cannot enforce
+        // does not have an explicit chainId parameter, wagmi cannot enforce
         // the chain context internally the way it does for sendTransactionAsync.
         // The sync switchChain() is fire-and-forget; awaiting it is a no-op, so
         // the signing call can fire while the wallet is still on the previous
@@ -805,7 +805,7 @@ export default function CashDemo() {
         // (USDC) on the destination chain AND has it approved the v6
         // Aggregation Router to spend it? If either is false, the submit is
         // rejected with `ORDER_SAVER_ERROR` / `NotEnoughBalanceOrAllowance`
-        // and the order never enters the book — resolvers never see it.
+        // and the order never enters the book, resolvers never see it.
         //
         // The previous "submit immediately after broadcast" ordering loses
         // this race deterministically: at T+~1s after the Across deposit tx
@@ -820,7 +820,7 @@ export default function CashDemo() {
         // The Fusion order's `deadline` (set inside the typed-data we just
         // signed) is 3-5 min by default. The bridge wait below is bounded at
         // 120s; Across typically delivers in 2-15s on the OP -> ETH route.
-        // Plenty of headroom — the signed order is comfortably valid by the
+        // Plenty of headroom, the signed order is comfortably valid by the
         // time we submit it.
         setPhase('fusion-bridging');
         const bridgeStart = Date.now();
@@ -848,7 +848,7 @@ export default function CashDemo() {
               }
             }
           } catch (e) {
-            // Network blip — keep polling. If it persists for 2 min the
+            // Network blip, keep polling. If it persists for 2 min the
             // outer timeout below will fire and surface a clear error.
             if (e instanceof Error && e.message.includes('Across deposit')) throw e;
           }
@@ -893,7 +893,7 @@ export default function CashDemo() {
         // From here on, the trade lives in 1inch's system independent of our
         // session. Next we extract depositId for the tracking-layer fire-and-
         // forget (Phase B) registration, then enter the fusion-auction polling
-        // loop. No need to setPhase('fusion-bridging') here — that happened
+        // loop. No need to setPhase('fusion-bridging') here, that happened
         // earlier (before the bridge-wait poll) and bridging is now complete.
         // --------- Step 6 (headless): wait for resolver fill via Fusion auction ---------
 
@@ -961,7 +961,7 @@ export default function CashDemo() {
         //     PoC behaves identically to today.
         //   - depositId is required by the tracking layer's contract; if our
         //     local extraction failed we skip rather than send a 400-bound body.
-        //   - No `await`. The fetch promise is intentionally orphaned — the
+        //   - No `await`. The fetch promise is intentionally orphaned, the
         //     user's success card renders identically whether this resolves,
         //     rejects, or hangs.
         //   - .catch uses console.debug (invisible by default, ignored by
@@ -2022,7 +2022,7 @@ function DemoBanner() {
           Bebop coverage). USDY and the live yield assets below use the direct Across Swap
           API path. Integration reference for ether.fi:{' '}
           <a href="/reference" className="gold-text hover:underline font-semibold">
-            etherfi-cash-across-poc.vercel.app/reference
+            /reference
           </a>
           .
         </span>

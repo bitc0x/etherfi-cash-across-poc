@@ -10,7 +10,7 @@ import { arbitrum, base, mainnet, optimism, polygon } from 'wagmi/chains';
 // for mainnet, etc.) return responses without CORS headers, so any read from the
 // browser is blocked by CORS policy in Brave, Chrome strict mode, and many other
 // configs. This silently breaks every useReadContract and publicClient.readContract
-// call from the browser — including the Fusion allowance preflight — and produces
+// call from the browser, including the Fusion allowance preflight, and produces
 // false-positive approval prompts even when the on-chain allowance is already
 // sufficient.
 //
